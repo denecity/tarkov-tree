@@ -102,6 +102,7 @@ HTML_TEMPLATE = """<!doctype html>
     <div id="search-modes">
       <button class="mode-btn active" data-mode="name">Name</button>
       <button class="mode-btn" data-mode="reward">Reward</button>
+      <button class="mode-btn" data-mode="unlock">Unlocks</button>
     </div>
     <div id="search-results"></div>
     <div id="legend">Click nodes to expand details. Scroll / drag to navigate.</div>
@@ -423,62 +424,87 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function rewardMatches(node, term) {
-        if (!term) return [];
-        const rewards = node.rewards || [];
-        const hits = [];
-        for (const r of rewards) {
-          if (!r.includes("×")) continue;
-          const m = r.match(/([0-9]+)\s*×\s*(.+)/);
-          const itemName = m ? m[2].trim() : r;
-          const count = m ? parseInt(m[1], 10) : 1;
-          if (itemName.toLowerCase().includes(term)) {
-            hits.push({ item: itemName, count });
-          }
+      if (!term) return [];
+      const rewards = node.rewards || [];
+      const hits = [];
+      for (const r of rewards) {
+        if (!r.includes("×")) continue;
+        const m = r.match(/([0-9]+)\s*×\s*(.+)/);
+        const itemName = m ? m[2].trim() : r;
+        const count = m ? parseInt(m[1], 10) : 1;
+        if (itemName.toLowerCase().includes(term)) {
+          hits.push({ item: itemName, count });
         }
-        return hits;
       }
+      return hits;
+    }
+
+    function unlockMatches(node, term) {
+          if (!term) return [];
+          const rewards = node.rewards || [];
+          const hits = [];
+          for (const r of rewards) {
+            const lower = r.toLowerCase();
+            if (!lower.startsWith("unlocks")) continue;
+            // Match purchase/barter/craft unlocks and capture the item name and location
+            const m = r.match(/^Unlocks\\s+(purchase|barter|craft)\\s+(?:for\\s+|of\\s+)?(.+?)(?:\\s+at\\s+(.+))?$/i);
+            if (!m || !m[2]) continue;
+            const kind = m[1] ? m[1].toLowerCase() : "unlock";
+            const itemName = m[2].trim();
+            const place = m[3] ? m[3].trim() : "";
+            if (itemName.toLowerCase().includes(term)) {
+              hits.push({ item: itemName, count: 1, kind, place });
+            }
+          }
+          return hits;
+        }
 
     function renderSearchResults(term) {
         searchResults.innerHTML = "";
         if (!term) return;
-        if (searchMode === "name") {
-          const matches = nodes.filter(n => n.name.toLowerCase().includes(term)).slice(0, 25);
-          matches.forEach(n => {
-            const pill = document.createElement("span");
-            pill.className = "pill";
-            pill.textContent = n.name;
-            pill.addEventListener("click", () => focusNode(n));
-            searchResults.appendChild(pill);
-          });
-          return;
-        }
+      if (searchMode === "name") {
+        const matches = nodes.filter(n => n.name.toLowerCase().includes(term)).slice(0, 25);
+        matches.forEach(n => {
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          pill.textContent = n.name;
+          pill.addEventListener("click", () => focusNode(n));
+          searchResults.appendChild(pill);
+        });
+        return;
+      }
 
-        const groups = new Map(); // item -> [{node, count}]
-        nodes.forEach(n => {
-          rewardMatches(n, term).forEach(hit => {
-            if (!groups.has(hit.item)) groups.set(hit.item, []);
-            groups.get(hit.item).push({ node: n, count: hit.count });
-          });
+      const groups = new Map(); // item -> [{node, count}]
+      const matcher = searchMode === "reward" ? rewardMatches : unlockMatches;
+      nodes.forEach(n => {
+        matcher(n, term).forEach(hit => {
+          if (!groups.has(hit.item)) groups.set(hit.item, []);
+          groups.get(hit.item).push({ node: n, count: hit.count, kind: hit.kind, place: hit.place });
         });
-        Array.from(groups.entries()).slice(0, 25).forEach(([item, arr]) => {
-          const box = document.createElement("div");
-          box.className = "item-group";
-          const title = document.createElement("div");
-          title.className = "item-title";
-          title.textContent = item;
-          box.appendChild(title);
-          const row = document.createElement("div");
-          row.className = "pill-row";
-          arr.forEach(({ node: n, count }) => {
-            const pill = document.createElement("span");
-            pill.className = "pill";
-            pill.textContent = `${n.name} (${count}x)`;
-            pill.addEventListener("click", () => focusNode(n));
-            row.appendChild(pill);
-          });
-          box.appendChild(row);
-          searchResults.appendChild(box);
+      });
+      Array.from(groups.entries()).slice(0, 25).forEach(([item, arr]) => {
+        const box = document.createElement("div");
+        box.className = "item-group";
+        const title = document.createElement("div");
+        title.className = "item-title";
+        title.textContent = item;
+        box.appendChild(title);
+        const row = document.createElement("div");
+        row.className = "pill-row";
+        arr.forEach(({ node: n, count, kind, place }) => {
+          const pill = document.createElement("span");
+          pill.className = "pill";
+          const meta = [];
+          if (kind) meta.push(kind);
+          if (place) meta.push(place);
+          const suffix = meta.length ? ` - ${meta.join(" @ ")}` : "";
+          pill.textContent = `${n.name} (${count}x)${suffix}`;
+          pill.addEventListener("click", () => focusNode(n));
+          row.appendChild(pill);
         });
+        box.appendChild(row);
+        searchResults.appendChild(box);
+      });
       }
 
     // Search behavior: list matching quests; clicking focuses them. No graph recolor.

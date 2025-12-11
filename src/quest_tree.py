@@ -119,11 +119,15 @@ HTML_TEMPLATE = """<!doctype html>
     const width = Math.max(window.innerWidth * 0.65, margin * 2 + columnGap * 8);
 
     // Initial positions based on level, random y to spread vertically
+    function lockableRoot(n) {
+      return (n.level || 0) === 0 && n.leads_to && n.leads_to.length > 0;
+    }
+
     nodes.forEach(n => {
       n.x = margin + (n.level || 0) * columnGap + (Math.random() - 0.5) * 20;
       n.y = margin + (Math.random() * (height - 2 * margin));
-      if ((n.level || 0) === 0) {
-        n.fx = margin; // lock x for roots
+      if (lockableRoot(n)) {
+        n.fx = margin; // lock x for root nodes that lead somewhere
       }
     });
 
@@ -218,7 +222,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.2).restart();
-      if ((event.subject.level || 0) === 0) {
+      if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots on the left
         event.subject.fy = event.subject.y; // allow y dragging
       } else {
@@ -235,7 +239,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function dragended(event) {
       if (!event.active) simulation.alphaTarget(0);
-      if ((event.subject.level || 0) === 0) {
+      if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots pinned on the left, free y
         event.subject.fy = null;
       } else {
@@ -505,36 +509,32 @@ def build_graph(df: pd.DataFrame, link_map: Dict[str, str]):
 
     links = [{"source": s, "target": t} for (s, t) in sorted(link_set)]
 
-    # Level assignment (left-to-right) using a topological-style pass; cycles are pushed minimally.
+    # Level assignment using multi-source BFS (shortest depth from any root) to avoid runaway levels in cycles.
     indegree = {n: 0 for n in nodes}
+    adjacency: Dict[str, List[str]] = {}
     for s, t in link_set:
         indegree[t] = indegree.get(t, 0) + 1
         indegree.setdefault(s, 0)
+        adjacency.setdefault(s, []).append(t)
 
-    levels = {n: 0 for n in nodes}
-    queue = [n for n, deg in indegree.items() if deg == 0]
+    roots = [n for n, deg in indegree.items() if deg == 0] or list(nodes.keys())
+    levels = {n: float("inf") for n in nodes}
+    for r in roots:
+        levels[r] = 0
 
+    queue = list(roots)
     while queue:
         cur = queue.pop(0)
         cur_level = levels[cur]
-        for s, t in link_set:
-            if s != cur:
-                continue
-            if levels.get(t, 0) < cur_level + 1:
-                levels[t] = cur_level + 1
-            indegree[t] -= 1
-            if indegree[t] == 0:
-                queue.append(t)
+        for nxt in adjacency.get(cur, []):
+            if cur_level + 1 < levels[nxt]:
+                levels[nxt] = cur_level + 1
+                queue.append(nxt)
 
-    # One more relaxation pass to handle cycles gracefully.
-    for _ in range(len(nodes)):
-        updated = False
-        for s, t in link_set:
-            if levels[t] < levels[s] + 1:
-                levels[t] = levels[s] + 1
-                updated = True
-        if not updated:
-            break
+    # Replace inf (isolated nodes) with 0
+    for n in levels:
+        if levels[n] == float("inf"):
+            levels[n] = 0
 
     for name, node in nodes.items():
         node["level"] = levels.get(name, 0)

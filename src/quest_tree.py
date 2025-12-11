@@ -84,7 +84,13 @@ HTML_TEMPLATE = """<!doctype html>
     .node.descendant circle { stroke: #f87171; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(248,113,113,0.75)); }
     .link.descendant-link { stroke: rgba(248,113,113,0.85); stroke-width: 2.4px; }
     #search { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); }
-    #search-results { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 8px; }
+    #search-modes { display: flex; gap: 8px; }
+    #search-modes .mode-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
+    #search-modes .mode-btn.active { border-color: var(--accent); color: #bfdbfe; }
+    #search-results { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 8px; }
+    #search-results .item-group { border: 1px solid var(--stroke); border-radius: 8px; padding: 8px; background: #0b1223; }
+    #search-results .item-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    #search-results .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
     #search-results .pill { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
     #search-results .pill:hover { border-color: var(--accent); color: #bfdbfe; }
   </style>
@@ -93,6 +99,10 @@ HTML_TEMPLATE = """<!doctype html>
   <div id="chart"></div>
   <div id="panel">
     <input id="search" placeholder="Search quests..." />
+    <div id="search-modes">
+      <button class="mode-btn active" data-mode="name">Name</button>
+      <button class="mode-btn" data-mode="reward">Reward</button>
+    </div>
     <div id="search-results"></div>
     <div id="legend">Click nodes to expand details. Scroll / drag to navigate.</div>
     <div id="card">
@@ -342,7 +352,17 @@ HTML_TEMPLATE = """<!doctype html>
 
     const search = document.getElementById("search");
     const searchResults = document.getElementById("search-results");
+    const searchModeButtons = Array.from(document.querySelectorAll("#search-modes .mode-btn"));
     const openLinkBtn = document.getElementById("open-link");
+    let searchMode = "name";
+
+    searchModeButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        searchMode = btn.dataset.mode;
+        searchModeButtons.forEach(b => b.classList.toggle("active", b === btn));
+        renderSearchResults(search.value.trim().toLowerCase());
+      });
+    });
 
     // Build reverse adjacency for ancestor highlighting (normalize ids)
     function buildParents() {
@@ -402,19 +422,69 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
+    function rewardMatches(node, term) {
+        if (!term) return [];
+        const rewards = node.rewards || [];
+        const hits = [];
+        for (const r of rewards) {
+          if (!r.includes("×")) continue;
+          const m = r.match(/([0-9]+)\s*×\s*(.+)/);
+          const itemName = m ? m[2].trim() : r;
+          const count = m ? parseInt(m[1], 10) : 1;
+          if (itemName.toLowerCase().includes(term)) {
+            hits.push({ item: itemName, count });
+          }
+        }
+        return hits;
+      }
+
+    function renderSearchResults(term) {
+        searchResults.innerHTML = "";
+        if (!term) return;
+        if (searchMode === "name") {
+          const matches = nodes.filter(n => n.name.toLowerCase().includes(term)).slice(0, 25);
+          matches.forEach(n => {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = n.name;
+            pill.addEventListener("click", () => focusNode(n));
+            searchResults.appendChild(pill);
+          });
+          return;
+        }
+
+        const groups = new Map(); // item -> [{node, count}]
+        nodes.forEach(n => {
+          rewardMatches(n, term).forEach(hit => {
+            if (!groups.has(hit.item)) groups.set(hit.item, []);
+            groups.get(hit.item).push({ node: n, count: hit.count });
+          });
+        });
+        Array.from(groups.entries()).slice(0, 25).forEach(([item, arr]) => {
+          const box = document.createElement("div");
+          box.className = "item-group";
+          const title = document.createElement("div");
+          title.className = "item-title";
+          title.textContent = item;
+          box.appendChild(title);
+          const row = document.createElement("div");
+          row.className = "pill-row";
+          arr.forEach(({ node: n, count }) => {
+            const pill = document.createElement("span");
+            pill.className = "pill";
+            pill.textContent = `${n.name} (${count}x)`;
+            pill.addEventListener("click", () => focusNode(n));
+            row.appendChild(pill);
+          });
+          box.appendChild(row);
+          searchResults.appendChild(box);
+        });
+      }
+
     // Search behavior: list matching quests; clicking focuses them. No graph recolor.
     search.addEventListener("input", (e) => {
       const term = e.target.value.trim().toLowerCase();
-      searchResults.innerHTML = "";
-      if (!term) return; // empty stops filtering
-      const matches = nodes.filter(n => n.name.toLowerCase().includes(term)).slice(0, 25);
-      matches.forEach(n => {
-        const pill = document.createElement("span");
-        pill.className = "pill";
-        pill.textContent = n.name;
-        pill.addEventListener("click", () => focusNode(n));
-        searchResults.appendChild(pill);
-      });
+      renderSearchResults(term);
     });
 
     // Preselect first node

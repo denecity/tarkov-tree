@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 from typing import Dict, List
+from urllib.parse import quote
 
 import pandas as pd
 
@@ -42,6 +44,7 @@ HTML_TEMPLATE = """<!doctype html>
       flex-direction: column;
       gap: 12px;
       box-shadow: -6px 0 24px rgba(0,0,0,0.4);
+      overflow-y: auto;
     }
     #panel h1 {
       margin: 0;
@@ -55,6 +58,7 @@ HTML_TEMPLATE = """<!doctype html>
       gap: 12px;
       flex-wrap: wrap;
     }
+    #card { display: flex; flex-direction: column; gap: 10px; }
     .chip { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.4); color: #bfdbfe; padding: 2px 8px; border-radius: 999px; }
     .section {
       background: var(--card);
@@ -66,16 +70,19 @@ HTML_TEMPLATE = """<!doctype html>
     .section ul { margin: 0; padding-left: 18px; color: #e5e7eb; font-size: 14px; line-height: 1.45; }
     .section p { margin: 0; color: #e5e7eb; }
     #legend { font-size: 12px; color: var(--muted); }
-    #open-link { padding: 10px 12px; border: 1px solid var(--accent); background: rgba(59,130,246,0.15); color: #bfdbfe; border-radius: 8px; cursor: pointer; font-weight: 600; }
-    #open-link:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--stroke); }
+    #open-link { padding: 10px 12px; border: 1px solid var(--accent); background: rgba(59,130,246,0.15); color: #bfdbfe; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 4px; align-self: flex-start; display: inline-flex; text-decoration: none; }
+    #open-link.is-disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--stroke); pointer-events: none; }
     svg { width: 100%; height: 100%; background: transparent; }
     .node { cursor: pointer; }
     .node circle { stroke: var(--stroke); stroke-width: 1.5; }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .link { stroke: rgba(148,163,184,0.5); stroke-width: 1.6px; }
     .node.selected circle { stroke: var(--accent-2); stroke-width: 3; }
     .node.ancestor circle { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
     .link.ancestor-link { stroke: rgba(56,189,248,0.85); stroke-width: 2.4px; }
+    .node.descendant circle { stroke: #f87171; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(248,113,113,0.75)); }
+    .link.descendant-link { stroke: rgba(248,113,113,0.85); stroke-width: 2.4px; }
     #search { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); }
     #search-results { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 0 8px; }
     #search-results .pill { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
@@ -91,10 +98,10 @@ HTML_TEMPLATE = """<!doctype html>
     <div id="card">
       <h1>Select a quest</h1>
       <div class="meta"></div>
-      <button id="open-link" class="primary">Open wiki page</button>
+      <a id="open-link" class="primary" target="_blank" rel="noopener noreferrer">Open wiki page</a>
       <div class="section" id="objectives-box"><h3>Objectives</h3><ul></ul></div>
       <div class="section" id="rewards-box"><h3>Rewards</h3><ul></ul></div>
-      <div class="section" id="dialogue-box"><h3>Dialogue</h3><ul></ul></div>
+      <div class="section" id="requirements-box"><h3>Requirements</h3><ul></ul></div>
       <div class="section" id="previous-box"><h3>Previous</h3><p>-</p></div>
       <div class="section" id="leads-box"><h3>Leads to</h3><p>-</p></div>
     </div>
@@ -151,6 +158,12 @@ HTML_TEMPLATE = """<!doctype html>
     node.append("circle")
       .attr("r", 10)
       .attr("fill", d => colorByTrader(d.given_by));
+
+    node.append("text")
+      .attr("class", "level-badge")
+      .attr("text-anchor", "middle")
+      .attr("dy", "4")
+      .text(d => d.required_level ? d.required_level : "");
 
     node.append("text")
       .attr("x", 12)
@@ -309,13 +322,16 @@ HTML_TEMPLATE = """<!doctype html>
         <span class="chip">Given by: ${d.given_by || "-"}</span>
         <span class="chip">Location: ${d.location || "-"}</span>
       `;
-      openLinkBtn.disabled = !d.url;
-      openLinkBtn.onclick = () => {
-        if (d.url) window.open(d.url, "_blank");
+      openLinkBtn.classList.toggle("is-disabled", !d.url);
+      openLinkBtn.href = d.url || "#";
+      openLinkBtn.target = d.url ? "_blank" : "_self";
+      openLinkBtn.rel = d.url ? "noopener noreferrer" : "";
+      openLinkBtn.onclick = (e) => {
+        if (!d.url) e.preventDefault();
       };
       setList("objectives-box", d.objectives);
       setList("rewards-box", d.rewards);
-      setList("dialogue-box", d.dialogue);
+      setList("requirements-box", d.requirements);
       setLinks("previous-box", d.previous);
       setLinks("leads-box", d.leads_to);
     }
@@ -336,6 +352,17 @@ HTML_TEMPLATE = """<!doctype html>
       return pmap;
     }
 
+    function buildChildren() {
+      const cmap = new Map();
+      links.forEach(l => {
+        const src = l.source.id ? l.source.id : l.source;
+        const tgt = l.target.id ? l.target.id : l.target;
+        if (!cmap.has(src)) cmap.set(src, []);
+        cmap.get(src).push(tgt);
+      });
+      return cmap;
+    }
+
     function collectAncestors(id, parents, acc = new Set()) {
       if (acc.has(id)) return acc;
       acc.add(id);
@@ -344,14 +371,30 @@ HTML_TEMPLATE = """<!doctype html>
       return acc;
     }
 
-    // Highlight ancestors and connecting links
+    function collectDescendants(id, children, acc = new Set()) {
+      if (acc.has(id)) return acc;
+      acc.add(id);
+      const cs = children.get(id) || [];
+      cs.forEach(c => collectDescendants(c, children, acc));
+      return acc;
+    }
+
+    // Highlight ancestors (previous) in blue and descendants (leads_to) in red
     function highlightAncestry(selectedId) {
       const parents = buildParents();
       const ancestorIds = collectAncestors(selectedId, parents);
+      const children = buildChildren();
+      const descendantIds = collectDescendants(selectedId, children);
       node.classed("ancestor", d => ancestorIds.has(d.id));
+      node.classed("descendant", d => descendantIds.has(d.id));
       link.classed("ancestor-link", l => {
         const tgt = l.target.id ? l.target.id : l.target;
         return ancestorIds.has(tgt);
+      });
+      link.classed("descendant-link", l => {
+        const src = l.source.id ? l.source.id : l.source;
+        const tgt = l.target.id ? l.target.id : l.target;
+        return descendantIds.has(src) && descendantIds.has(tgt);
       });
     }
 
@@ -386,6 +429,14 @@ def normalize_list(raw: str) -> List[str]:
     return [p for p in parts if p]
 
 
+def parse_required_level(requirements: List[str]):
+    for req in requirements:
+        match = re.search(r"must be level\s*(\d+)", req, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
+
+
 def build_graph(df: pd.DataFrame, link_map: Dict[str, str]):
     nodes: Dict[str, Dict] = {}
     link_set = set()
@@ -394,14 +445,22 @@ def build_graph(df: pd.DataFrame, link_map: Dict[str, str]):
         return None if val is None or (isinstance(val, float) and pd.isna(val)) else val
 
     def ensure_node(name: str, row_data=None):
+        # Fallback wiki URL even if quest_links lookup misses a title match.
+        def resolved_url(n: str):
+            if not n:
+                return None
+            return link_map.get(n) or f"https://escapefromtarkov.fandom.com/wiki/{quote(n.replace(' ', '_'))}"
+
         if name not in nodes:
             nodes[name] = {
                 "id": name,
                 "name": name,
                 "location": None,
                 "given_by": None,
-                "url": link_map.get(name),
+                "url": resolved_url(name),
                 "dialogue": [],
+                "requirements": [],
+                "required_level": None,
                 "objectives": [],
                 "rewards": [],
                 "previous": [],
@@ -414,9 +473,13 @@ def build_graph(df: pd.DataFrame, link_map: Dict[str, str]):
             if not node.get("given_by"):
                 node["given_by"] = clean_value(row_data.get("given_by"))
             if not node.get("url"):
-                node["url"] = link_map.get(name)
+                node["url"] = clean_value(row_data.get("url")) or resolved_url(name)
             if not node.get("dialogue"):
                 node["dialogue"] = normalize_list(row_data.get("dialogue"))
+            if not node.get("requirements"):
+                node["requirements"] = normalize_list(row_data.get("requirements"))
+            if node.get("required_level") is None:
+                node["required_level"] = parse_required_level(node.get("requirements", []))
             if not node.get("objectives"):
                 node["objectives"] = normalize_list(row_data.get("objectives"))
             if not node.get("rewards"):
@@ -480,7 +543,7 @@ def build_graph(df: pd.DataFrame, link_map: Dict[str, str]):
 
 
 def main():
-    df = pd.read_csv("quests.csv", encoding="utf-8")
+    df = pd.read_csv("src/quests.csv", encoding="utf-8")
 
     link_map: Dict[str, str] = {}
     link_file = Path("quest_links.json")

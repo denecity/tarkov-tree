@@ -11,8 +11,8 @@ import requests
 from bs4 import BeautifulSoup
 
 USER_AGENT = "quest-scraper/1.0 (+https://github.com/)"  # polite UA
-DEFAULT_INPUT = "quest_links.json"
-DEFAULT_OUTPUT = "quests.csv"
+DEFAULT_INPUT = "src/quest_links.json"
+DEFAULT_OUTPUT = "src/quests.csv"
 
 
 @dataclass
@@ -21,6 +21,7 @@ class Quest:
     location: Optional[str]
     given_by: Optional[str]
     dialogue: List[str]
+    requirements: List[str]
     objectives: List[str]
     rewards: List[str]
     previous: List[str]
@@ -29,7 +30,7 @@ class Quest:
     def as_row(self) -> dict:
         data = asdict(self)
         # Flatten list-like fields into pipe-delimited strings for CSV usability.
-        for key in ["dialogue", "objectives", "rewards", "previous", "leads_to"]:
+        for key in ["dialogue", "requirements", "objectives", "rewards", "previous", "leads_to"]:
             data[key] = " | ".join(data[key]) if data[key] else ""
         return data
 
@@ -115,6 +116,7 @@ def scrape_quest(url: str) -> Quest:
     location = extract_infobox_value(soup, "Location")
     previous, leads_to = extract_related(soup)
     dialogue = extract_section_lines(soup, "Dialogue")
+    requirements = extract_section_lines(soup, "Requirements")
     objectives = extract_section_lines(soup, "Objectives")
     rewards = extract_section_lines(soup, "Rewards")
 
@@ -123,6 +125,7 @@ def scrape_quest(url: str) -> Quest:
         location=location,
         given_by=given_by,
         dialogue=dialogue,
+        requirements=requirements,
         objectives=objectives,
         rewards=rewards,
         previous=previous,

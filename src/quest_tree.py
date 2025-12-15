@@ -35,6 +35,7 @@ HTML_TEMPLATE = """<!doctype html>
       display: grid;
       grid-template-columns: 2fr 1fr;
       height: 100vh;
+      padding-bottom: 32px;
     }
     #chart { position: relative; border-right: 1px solid #1f2937; }
     #panel {
@@ -93,6 +94,30 @@ HTML_TEMPLATE = """<!doctype html>
     #search-results .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
     #search-results .pill { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
     #search-results .pill:hover { border-color: var(--accent); color: #bfdbfe; }
+    #footer-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 6px 12px;
+      background: rgba(17, 24, 39, 0.94);
+      border-top: 1px solid var(--stroke);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.1px;
+    }
+    #footer-bar a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    #footer-bar a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -116,6 +141,10 @@ HTML_TEMPLATE = """<!doctype html>
       <div class="section" id="previous-box"><h3>Previous</h3><p>-</p></div>
       <div class="section" id="leads-box"><h3>Leads to</h3><p>-</p></div>
     </div>
+  </div>
+  <div id="footer-bar">
+    Scraped for Tarkov 1.0 — missing quest info? Contact me or fork the repo at
+    <a href="https://github.com/denecity/tarkov-tree" target="_blank" rel="noopener noreferrer">github.com/denecity/tarkov-tree</a>
   </div>
 
   <script>

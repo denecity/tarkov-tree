@@ -35,7 +35,7 @@ HTML_TEMPLATE = """<!doctype html>
       display: grid;
       grid-template-columns: 2fr 1fr;
       height: 100vh;
-      padding-bottom: 32px;
+      padding-bottom: 26px;
     }
     #chart { position: relative; border-right: 1px solid #1f2937; }
     #panel {
@@ -99,13 +99,13 @@ HTML_TEMPLATE = """<!doctype html>
       bottom: 0;
       left: 0;
       right: 0;
-      height: 28px;
+      height: 20px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 10px;
-      padding: 6px 12px;
-      background: rgba(17, 24, 39, 0.94);
+      padding: 4px 12px;
+      background: var(--panel);
       border-top: 1px solid var(--stroke);
       font-size: 12px;
       color: var(--muted);

@@ -143,7 +143,7 @@ HTML_TEMPLATE = """<!doctype html>
     </div>
   </div>
   <div id="footer-bar">
-    Scraped for Tarkov 1.0 — missing quest info? Contact me or fork the repo at
+    Scraped for Tarkov 1.0.1.0.42625 — missing quest info? Contact me or fork the repo at
     <a href="https://github.com/denecity/tarkov-tree" target="_blank" rel="noopener noreferrer">github.com/denecity/tarkov-tree</a>
   </div>
 
@@ -684,7 +684,7 @@ def main():
         .replace("__LINKS__", json.dumps(links, ensure_ascii=False))
     )
 
-    out_path = Path("quest_tree.html")
+    out_path = Path("index.html")
     out_path.write_text(html, encoding="utf-8")
     print(f"Generated interactive quest tree at {out_path}")
 

@@ -6,25 +6,32 @@ from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urljoin
 
+import requests
 from bs4 import BeautifulSoup
 
-# Default locations and selectors for the saved wiki page.
-DEFAULT_HTML = "Quests - The Official Escape from Tarkov Wiki.htm"
+# Default locations and selectors for the live wiki page.
+DEFAULT_URL = "https://escapefromtarkov.fandom.com/wiki/Quests"
 DEFAULT_OUTPUT = "quest_links.json"
 DEFAULT_BASE_URL = "https://escapefromtarkov.fandom.com"
 NAVBOX_SELECTOR = "table.navbox.va-navbox-border.va-navbox-bottom"
+USER_AGENT = "quest-link-scraper/1.0 (+https://github.com/)"
 
 
-def extract_quest_links(html_path: Path, base_url: str = DEFAULT_BASE_URL) -> List[Dict[str, str]]:
+def fetch_html(url: str) -> str:
+    resp = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
+    resp.raise_for_status()
+    return resp.text
+
+
+def extract_quest_links(html_text: str, base_url: str = DEFAULT_BASE_URL) -> List[Dict[str, str]]:
     """
     Parse the quest navbox and return quest links with their owning trader.
     """
-    html_text = html_path.read_text(encoding="utf-8")
     soup = BeautifulSoup(html_text, "html.parser")
 
     navbox = soup.select_one(NAVBOX_SELECTOR)
     if navbox is None:
-        raise RuntimeError(f"Navbox ({NAVBOX_SELECTOR}) not found in {html_path}")
+        raise RuntimeError(f"Navbox ({NAVBOX_SELECTOR}) not found in page source")
 
     quests: List[Dict[str, str]] = []
     seen_hrefs = set()
@@ -56,8 +63,9 @@ def extract_quest_links(html_path: Path, base_url: str = DEFAULT_BASE_URL) -> Li
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Extract quest links from the saved Tarkov wiki page.")
-    parser.add_argument("--html", default=DEFAULT_HTML, type=Path, help="Path to the saved HTML file.")
+    parser = argparse.ArgumentParser(description="Extract quest links from the Tarkov wiki page.")
+    parser.add_argument("--url", default=DEFAULT_URL, help="Quest list URL to scrape.")
+    parser.add_argument("--html", type=Path, help="Optional path to a saved HTML file instead of --url.")
     parser.add_argument("--out", default=DEFAULT_OUTPUT, type=Path, help="Where to write the quest link JSON.")
     parser.add_argument(
         "--base-url",
@@ -66,7 +74,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    quests = extract_quest_links(args.html, base_url=args.base_url)
+    if args.html:
+        html_text = args.html.read_text(encoding="utf-8")
+    else:
+        html_text = fetch_html(args.url)
+
+    quests = extract_quest_links(html_text, base_url=args.base_url)
     args.out.write_text(json.dumps(quests, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Wrote {len(quests)} quest links to {args.out}")
 

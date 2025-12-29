@@ -15,6 +15,7 @@ HTML_TEMPLATE = """<!doctype html>
   <meta charset="utf-8" />
   <title>Tarkov Quest Tree</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" />
   <style>
     :root {
       --bg: #0f172a;
@@ -25,6 +26,7 @@ HTML_TEMPLATE = """<!doctype html>
       --muted: #9ca3af;
       --accent: #3b82f6;
       --accent-2: #22d3ee;
+      --status-completed: #22c55e;
     }
     body {
       margin: 0;
@@ -75,15 +77,19 @@ HTML_TEMPLATE = """<!doctype html>
     #open-link.is-disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--stroke); pointer-events: none; }
     svg { width: 100%; height: 100%; background: transparent; }
     .node { cursor: pointer; }
-    .node circle { stroke: var(--stroke); stroke-width: 1.5; }
+    .node circle.core { stroke: var(--stroke); stroke-width: 1.5; }
+    .node circle.status-ring { fill: none; stroke-width: 4; opacity: 0; }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .link { stroke: rgba(148,163,184,0.5); stroke-width: 1.6px; }
-    .node.selected circle { stroke: var(--accent-2); stroke-width: 3; }
-    .node.ancestor circle { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
+    .node.selected circle.core { stroke: var(--accent-2); stroke-width: 3; }
+    .node.ancestor circle.core { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
     .link.ancestor-link { stroke: rgba(56,189,248,0.85); stroke-width: 2.4px; }
-    .node.descendant circle { stroke: #f87171; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(248,113,113,0.75)); }
+    .node.descendant circle.core { stroke: #f87171; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(248,113,113,0.75)); }
     .link.descendant-link { stroke: rgba(248,113,113,0.85); stroke-width: 2.4px; }
+    .node.is-completed circle.core { fill: #334155; stroke: #475569; }
+    .node.is-completed text { fill: #94a3b8; text-shadow: none; }
+    .node.is-completed .level-badge { fill: #e2e8f0; stroke: #1f2937; }
     #search { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); }
     #search-modes { display: flex; gap: 8px; }
     #search-modes .mode-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
@@ -118,6 +124,56 @@ HTML_TEMPLATE = """<!doctype html>
     #footer-bar a:hover {
       text-decoration: underline;
     }
+    #progress-bar {
+      background: var(--card);
+      border: 1px solid var(--stroke);
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .progress-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .progress-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+    #progress-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+    .progress-btn {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: #0b1223;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .progress-btn.active { border-color: var(--accent); color: #bfdbfe; }
+    .progress-action {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: #0b1223;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .file-input { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; }
+    .file-input input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    #progress-meta { display: flex; flex-wrap: wrap; gap: 10px; }
+    #progress-current { margin: 0; font-size: 11px; color: var(--muted); }
+    #progress-message { min-height: 14px; font-size: 11px; color: var(--muted); }
+    #progress-message[data-tone="success"] { color: #86efac; }
+    #progress-message[data-tone="error"] { color: #fca5a5; }
+    #progress-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+    .progress-action.icon-btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .material-symbols-outlined {
+      font-size: 18px;
+      line-height: 1;
+      font-variation-settings: "opsz" 20, "wght" 400, "FILL" 0, "GRAD" 0;
+    }
   </style>
 </head>
 <body>
@@ -130,6 +186,29 @@ HTML_TEMPLATE = """<!doctype html>
       <button class="mode-btn" data-mode="unlock">Unlocks</button>
     </div>
     <div id="search-results"></div>
+    <div id="progress-bar">
+      <div class="progress-row">
+        <div class="progress-title">Progress</div>
+        <div id="progress-buttons">
+          <button class="progress-btn" data-status="none">Not completed</button>
+          <button class="progress-btn" data-status="completed">Completed</button>
+        </div>
+        <div id="progress-actions">
+          <button class="progress-action icon-btn" id="export-progress" aria-label="Export progress" title="Export JSON">
+            <span class="material-symbols-outlined" aria-hidden="true">file_upload</span>
+          </button>
+          <label class="progress-action icon-btn file-input" aria-label="Import progress" title="Import JSON">
+            <input id="import-progress" type="file" accept="application/json" />
+            <span class="material-symbols-outlined" aria-hidden="true">file_download</span>
+          </label>
+          <button class="progress-action" id="clear-progress" title="Clear all progress">Clear</button>
+        </div>
+      </div>
+      <div id="progress-meta">
+        <span id="progress-current">Status: Not completed</span>
+        <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
+      </div>
+    </div>
     <div id="legend">Click nodes to expand details. Scroll / drag to navigate.</div>
     <div id="card">
       <h1>Select a quest</h1>
@@ -152,6 +231,90 @@ HTML_TEMPLATE = """<!doctype html>
     const nodes = __NODES__;
     const links = __LINKS__.map(l => ({ source: l.source, target: l.target }));
     const nodesById = new Map(nodes.map(n => [n.id, n]));
+    const STORAGE_KEY = "tarkov-quest-progress";
+    const PROGRESS_ENABLED_KEY = "tarkov-quest-progress-enabled";
+    const STATUS_LABELS = {
+      none: "Not completed",
+      completed: "Completed"
+    };
+    const STATUS_COLORS = {
+      completed: "var(--status-completed)"
+    };
+    const STATUS_ALIASES = {
+      completed: "completed",
+      complete: "completed",
+      done: "completed",
+      finished: "completed",
+      none: "none",
+      "not_completed": "none",
+      "not started": "none",
+      "not_started": "none",
+      "in_progress": "none",
+      "blocked": "none"
+    };
+
+    function normalizeStatus(raw) {
+      if (!raw) return "none";
+      const cleaned = String(raw).toLowerCase().replace(/\\s+/g, "_").replace(/-+/g, "_");
+      return STATUS_ALIASES[cleaned] || "none";
+    }
+
+    function loadProgress() {
+      try {
+        const enabled = localStorage.getItem(PROGRESS_ENABLED_KEY) === "true";
+        if (!enabled) return new Map();
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return new Map();
+        const parsed = JSON.parse(raw);
+        const statuses = parsed && typeof parsed === "object" && parsed.statuses ? parsed.statuses : parsed;
+        if (!statuses || typeof statuses !== "object") return new Map();
+        const map = new Map();
+        Object.entries(statuses).forEach(([id, status]) => {
+          const normalized = normalizeStatus(status);
+          if (normalized !== "none") {
+            map.set(id, normalized);
+          }
+        });
+        return map;
+      } catch (_) {
+        return new Map();
+      }
+    }
+
+    function enableProgressLoading() {
+      try {
+        localStorage.setItem(PROGRESS_ENABLED_KEY, "true");
+      } catch (_) {
+        // Ignore storage failures (private mode, quota).
+      }
+    }
+
+    function buildExportPayload(progress) {
+      return {
+        version: 1,
+        updatedAt: new Date().toISOString(),
+        statuses: Object.fromEntries(progress)
+      };
+    }
+
+    let progressMap = loadProgress();
+
+    function statusFor(id) {
+      return progressMap.get(id) || "none";
+    }
+
+    function statusColor(status) {
+      return STATUS_COLORS[status] || "transparent";
+    }
+
+    function saveProgress() {
+      try {
+        const payload = buildExportPayload(progressMap);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (_) {
+        // Ignore storage failures (private mode, quota).
+      }
+    }
 
     const margin = 100;
     const columnGap = 220;
@@ -200,6 +363,13 @@ HTML_TEMPLATE = """<!doctype html>
         .on("end", dragended));
 
     node.append("circle")
+      .attr("class", "status-ring")
+      .attr("r", 15)
+      .attr("stroke", d => statusColor(statusFor(d.id)))
+      .attr("opacity", d => statusFor(d.id) === "none" ? 0 : 1);
+
+    node.append("circle")
+      .attr("class", "core")
       .attr("r", 10)
       .attr("fill", d => colorByTrader(d.given_by));
 
@@ -218,6 +388,7 @@ HTML_TEMPLATE = """<!doctype html>
       selectNode(d);
       highlightAncestry(d.id);
     });
+    applyProgressToNodes();
 
     // Custom force to encourage targets to sit to the right of their sources
     function forceRightBias(strength = 0.1, gap = 80) {
@@ -306,6 +477,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     const card = document.getElementById("card");
+    let selectedNode = null;
     function setList(boxId, items) {
       const ul = document.querySelector(`#${boxId} ul`);
       ul.innerHTML = "";
@@ -360,6 +532,7 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function selectNode(d) {
+      selectedNode = d;
       node.classed("selected", n => n.id === d.id);
       card.querySelector("h1").textContent = d.name;
       card.querySelector(".meta").innerHTML = `
@@ -378,13 +551,120 @@ HTML_TEMPLATE = """<!doctype html>
       setList("requirements-box", d.requirements);
       setLinks("previous-box", d.previous);
       setLinks("leads-box", d.leads_to);
+      updateProgressButtons();
     }
 
     const search = document.getElementById("search");
     const searchResults = document.getElementById("search-results");
     const searchModeButtons = Array.from(document.querySelectorAll("#search-modes .mode-btn"));
     const openLinkBtn = document.getElementById("open-link");
+    const progressButtons = Array.from(document.querySelectorAll("#progress-buttons .progress-btn"));
+    const progressCurrent = document.getElementById("progress-current");
+    const progressMessage = document.getElementById("progress-message");
+    const exportProgressBtn = document.getElementById("export-progress");
+    const importProgressInput = document.getElementById("import-progress");
+    const clearProgressBtn = document.getElementById("clear-progress");
     let searchMode = "name";
+
+    function setProgressMessage(text, tone = "info") {
+      if (!progressMessage) return;
+      progressMessage.textContent = text;
+      progressMessage.dataset.tone = tone;
+    }
+
+    function updateProgressButtons() {
+      if (!progressButtons.length) return;
+      const status = selectedNode ? statusFor(selectedNode.id) : "none";
+      progressButtons.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.status === status);
+      });
+      if (progressCurrent) {
+        progressCurrent.textContent = `Status: ${STATUS_LABELS[status] || STATUS_LABELS.none}`;
+      }
+    }
+
+    function applyProgressToNode(id) {
+      const status = statusFor(id);
+      const target = nodesById.get(id);
+      if (target) {
+        target.progress = status;
+      }
+      node.filter(d => d.id === id)
+        .classed("is-completed", status === "completed")
+        .select("circle.status-ring")
+        .attr("stroke", statusColor(status))
+        .attr("opacity", status === "none" ? 0 : 1);
+    }
+
+    function applyProgressToNodes() {
+      nodes.forEach(n => {
+        n.progress = statusFor(n.id);
+      });
+      node
+        .classed("is-completed", d => statusFor(d.id) === "completed")
+        ;
+      node.select("circle.status-ring")
+        .attr("stroke", d => statusColor(statusFor(d.id)))
+        .attr("opacity", d => statusFor(d.id) === "none" ? 0 : 1);
+    }
+
+    function setStatus(id, status) {
+      enableProgressLoading();
+      const normalized = normalizeStatus(status);
+      if (normalized === "none") {
+        progressMap.delete(id);
+      } else {
+        progressMap.set(id, normalized);
+      }
+      saveProgress();
+      applyProgressToNode(id);
+      updateProgressButtons();
+    }
+
+    function replaceProgress(newMap, message) {
+      progressMap = newMap;
+      saveProgress();
+      applyProgressToNodes();
+      updateProgressButtons();
+      if (message) {
+        setProgressMessage(message, "success");
+      }
+    }
+
+    function importProgressFromText(rawText) {
+      try {
+        const parsed = JSON.parse(rawText);
+        const statuses = parsed && typeof parsed === "object" && parsed.statuses ? parsed.statuses : parsed;
+        if (!statuses || typeof statuses !== "object") {
+          throw new Error("Invalid progress file.");
+        }
+        const map = new Map();
+        Object.entries(statuses).forEach(([id, status]) => {
+          const normalized = normalizeStatus(status);
+          if (normalized !== "none") {
+            map.set(id, normalized);
+          }
+        });
+        enableProgressLoading();
+        replaceProgress(map, "Imported progress JSON.");
+      } catch (err) {
+        setProgressMessage("Could not import JSON. Check the file format.", "error");
+      }
+    }
+
+    function exportProgressToFile() {
+      const payload = buildExportPayload(progressMap);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "tarkov-progress.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setProgressMessage("Exported progress JSON.", "success");
+    }
 
     searchModeButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -393,6 +673,37 @@ HTML_TEMPLATE = """<!doctype html>
         renderSearchResults(search.value.trim().toLowerCase());
       });
     });
+
+    progressButtons.forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!selectedNode) return;
+        setStatus(selectedNode.id, btn.dataset.status);
+        const status = normalizeStatus(btn.dataset.status);
+        setProgressMessage(`Set to ${STATUS_LABELS[status] || STATUS_LABELS.none}.`, "success");
+      });
+    });
+
+    if (exportProgressBtn) {
+      exportProgressBtn.addEventListener("click", () => exportProgressToFile());
+    }
+
+    if (importProgressInput) {
+      importProgressInput.addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        file.text()
+          .then(text => importProgressFromText(text))
+          .catch(() => setProgressMessage("Could not read the selected file.", "error"));
+        importProgressInput.value = "";
+      });
+    }
+
+    if (clearProgressBtn) {
+      clearProgressBtn.addEventListener("click", () => {
+        if (!confirm("Clear all quest progress?")) return;
+        replaceProgress(new Map(), "Cleared all progress.");
+      });
+    }
 
     // Build reverse adjacency for ancestor highlighting (normalize ids)
     function buildParents() {

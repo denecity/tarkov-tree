@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Tarkov Quest Tree</title>
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,400,0,0" />
   <style>
     :root {
       --bg: #0f172a;
@@ -156,7 +157,12 @@
     #progress-message[data-tone="success"] { color: #86efac; }
     #progress-message[data-tone="error"] { color: #fca5a5; }
     #progress-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-    .progress-icon { font-weight: 700; }
+    .progress-action.icon-btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+    .material-symbols-outlined {
+      font-size: 18px;
+      line-height: 1;
+      font-variation-settings: "opsz" 20, "wght" 400, "FILL" 0, "GRAD" 0;
+    }
   </style>
 </head>
 <body>
@@ -177,12 +183,12 @@
           <button class="progress-btn" data-status="completed">Completed</button>
         </div>
         <div id="progress-actions">
-          <button class="progress-action" id="export-progress" aria-label="Export progress" title="Export JSON">
-            <span class="progress-icon">↑</span>
+          <button class="progress-action icon-btn" id="export-progress" aria-label="Export progress" title="Export JSON">
+            <span class="material-symbols-outlined" aria-hidden="true">file_upload</span>
           </button>
-          <label class="progress-action file-input" aria-label="Import progress" title="Import JSON">
+          <label class="progress-action icon-btn file-input" aria-label="Import progress" title="Import JSON">
             <input id="import-progress" type="file" accept="application/json" />
-            <span class="progress-icon">↓</span>
+            <span class="material-symbols-outlined" aria-hidden="true">file_download</span>
           </label>
           <button class="progress-action" id="clear-progress" title="Clear all progress">Clear</button>
         </div>

@@ -89,6 +89,15 @@ HTML_TEMPLATE = """<!doctype html>
     .node circle.status-ring { fill: none; stroke-width: 4; opacity: 0; }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    .node .unlock-badge {
+      font-size: 18px;
+      font-weight: 800;
+      fill: #f59e0b;
+      stroke: #0b1223;
+      stroke-width: 2;
+      paint-order: stroke;
+      pointer-events: none;
+    }
     .link { stroke: rgba(148,163,184,0.5); stroke-width: 1.6px; }
     .node.selected circle.core { stroke: var(--accent-2); stroke-width: 3; }
     .node.ancestor circle.core { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
@@ -217,7 +226,7 @@ HTML_TEMPLATE = """<!doctype html>
         <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
       </div>
     </div>
-    <div id="legend">Click nodes to expand details. Scroll / drag to navigate.</div>
+    <div id="legend">Click nodes to expand details. Scroll / drag to navigate. Orange dot = unlocks.</div>
     <div id="card">
       <h1>Select a quest</h1>
       <div class="meta"></div>
@@ -315,6 +324,18 @@ HTML_TEMPLATE = """<!doctype html>
       return STATUS_COLORS[status] || "transparent";
     }
 
+    const XP_RE = /\\bexp\\b/i;
+    const REP_RE = /\\bRep\\b/i;
+    const REP_FALLBACK_RE = /^[A-Za-z][A-Za-z\\s-]+\\s*[+-]\\d/;
+    const MONEY_RE = /\\b(Roubles|Rubles|Dollars|Euros)\\b/i;
+    const UNLOCK_RE = /^Unlocks\\b/i;
+    const ITEM_RE = /^\\d+\\s*[x\\u00d7]\\s*/i;
+    const ITEM_COUNT_RE = /^\\d[\\d,]*\\s+\\S+/;
+
+    function rewardHasUnlocks(rewards) {
+      return (rewards || []).some(reward => UNLOCK_RE.test(reward || ""));
+    }
+
     function saveProgress() {
       try {
         const payload = buildExportPayload(progressMap);
@@ -365,6 +386,7 @@ HTML_TEMPLATE = """<!doctype html>
       .data(nodes)
       .join("g")
       .attr("class", "node")
+      .classed("has-unlocks", d => rewardHasUnlocks(d.rewards))
       .call(d3.drag()
         .on("start", dragstarted)
         .on("drag", dragged)
@@ -372,14 +394,23 @@ HTML_TEMPLATE = """<!doctype html>
 
     node.append("circle")
       .attr("class", "status-ring")
-      .attr("r", 15)
+      .attr("r", 18)
       .attr("stroke", d => statusColor(statusFor(d.id)))
       .attr("opacity", d => statusFor(d.id) === "none" ? 0 : 1);
 
     node.append("circle")
       .attr("class", "core")
-      .attr("r", 10)
+      .attr("r", 12)
       .attr("fill", d => colorByTrader(d.given_by));
+
+    node.append("text")
+      .attr("class", "unlock-badge")
+      .attr("x", 9)
+      .attr("y", -8)
+      .attr("text-anchor", "middle")
+      .attr("dominant-baseline", "middle")
+      .attr("opacity", d => rewardHasUnlocks(d.rewards) ? 1 : 0)
+      .text("+");
 
     node.append("text")
       .attr("class", "level-badge")
@@ -539,12 +570,6 @@ HTML_TEMPLATE = """<!doctype html>
       });
     }
 
-    const XP_RE = /\\bexp\\b/i;
-    const REP_RE = /\\bRep\\b/i;
-    const MONEY_RE = /\\b(Roubles|Rubles|Dollars|Euros)\\b/i;
-    const UNLOCK_RE = /^Unlocks\\b/i;
-    const ITEM_RE = /^\\d+\\s*[x\\u00d7]\\s*/i;
-
     function setRewards(list) {
       const container = document.querySelector("#rewards-box .rewards-body");
       if (!container) return;
@@ -572,11 +597,11 @@ HTML_TEMPLATE = """<!doctype html>
           buckets.unlocks.push(reward);
         } else if (XP_RE.test(reward)) {
           buckets.xp.push(reward);
-        } else if (REP_RE.test(reward)) {
+        } else if (REP_RE.test(reward) || REP_FALLBACK_RE.test(reward)) {
           buckets.rep.push(reward);
         } else if (MONEY_RE.test(reward)) {
           buckets.money.push(reward);
-        } else if (ITEM_RE.test(reward)) {
+        } else if (ITEM_RE.test(reward) || ITEM_COUNT_RE.test(reward)) {
           buckets.items.push(reward);
         } else {
           buckets.other.push(reward);

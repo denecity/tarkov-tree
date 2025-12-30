@@ -61,6 +61,14 @@
     .section h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
     .section ul { margin: 0; padding-left: 18px; color: #e5e7eb; font-size: 14px; line-height: 1.45; }
     .section p { margin: 0; color: #e5e7eb; }
+    #rewards-box .rewards-body { display: flex; flex-direction: column; gap: 10px; }
+    #rewards-box .reward-group { display: flex; flex-direction: column; gap: 4px; }
+    #rewards-box .reward-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
     #legend { font-size: 12px; color: var(--muted); }
     #open-link { padding: 10px 12px; border: 1px solid var(--accent); background: rgba(59,130,246,0.15); color: #bfdbfe; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 4px; align-self: flex-start; display: inline-flex; text-decoration: none; }
     #open-link.is-disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--stroke); pointer-events: none; }
@@ -204,7 +212,7 @@
       <div class="meta"></div>
       <a id="open-link" class="primary" target="_blank" rel="noopener noreferrer">Open wiki page</a>
       <div class="section" id="objectives-box"><h3>Objectives</h3><ul></ul></div>
-      <div class="section" id="rewards-box"><h3>Rewards</h3><ul></ul></div>
+      <div class="section" id="rewards-box"><h3>Rewards</h3><div class="rewards-body"></div></div>
       <div class="section" id="requirements-box"><h3>Requirements</h3><ul></ul></div>
       <div class="section" id="previous-box"><h3>Previous</h3><p>-</p></div>
       <div class="section" id="leads-box"><h3>Leads to</h3><p>-</p></div>
@@ -520,6 +528,87 @@
       });
     }
 
+    const XP_RE = /\bexp\b/i;
+    const REP_RE = /\bRep\b/i;
+    const MONEY_RE = /\b(Roubles|Rubles|Dollars|Euros)\b/i;
+    const UNLOCK_RE = /^Unlocks\b/i;
+    const ITEM_RE = /^\d+\s*[x\u00d7]\s*/i;
+
+    function setRewards(list) {
+      const container = document.querySelector("#rewards-box .rewards-body");
+      if (!container) return;
+      container.innerHTML = "";
+      if (!list || !list.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "-";
+        container.appendChild(empty);
+        return;
+      }
+
+      const buckets = {
+        xp: [],
+        rep: [],
+        money: [],
+        items: [],
+        unlocks: [],
+        other: [],
+      };
+
+      list.forEach((raw) => {
+        const reward = (raw || "").trim();
+        if (!reward) return;
+        if (UNLOCK_RE.test(reward)) {
+          buckets.unlocks.push(reward);
+        } else if (XP_RE.test(reward)) {
+          buckets.xp.push(reward);
+        } else if (REP_RE.test(reward)) {
+          buckets.rep.push(reward);
+        } else if (MONEY_RE.test(reward)) {
+          buckets.money.push(reward);
+        } else if (ITEM_RE.test(reward)) {
+          buckets.items.push(reward);
+        } else {
+          buckets.other.push(reward);
+        }
+      });
+
+      const groups = [
+        { key: "xp", label: "XP reward" },
+        { key: "rep", label: "Trader rep" },
+        { key: "money", label: "Money reward" },
+        { key: "items", label: "Item rewards" },
+        { key: "unlocks", label: "Item unlocks" },
+        { key: "other", label: "Other rewards" },
+      ];
+
+      let added = 0;
+      groups.forEach(({ key, label }) => {
+        const items = buckets[key];
+        if (!items.length) return;
+        const groupEl = document.createElement("div");
+        groupEl.className = "reward-group";
+        const labelEl = document.createElement("div");
+        labelEl.className = "reward-label";
+        labelEl.textContent = label;
+        const listEl = document.createElement("ul");
+        items.forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = item;
+          listEl.appendChild(li);
+        });
+        groupEl.appendChild(labelEl);
+        groupEl.appendChild(listEl);
+        container.appendChild(groupEl);
+        added += 1;
+      });
+
+      if (!added) {
+        const empty = document.createElement("p");
+        empty.textContent = "-";
+        container.appendChild(empty);
+      }
+    }
+
     function selectNode(d) {
       selectedNode = d;
       node.classed("selected", n => n.id === d.id);
@@ -536,7 +625,7 @@
         if (!d.url) e.preventDefault();
       };
       setList("objectives-box", d.objectives);
-      setList("rewards-box", d.rewards);
+      setRewards(d.rewards);
       setList("requirements-box", d.requirements);
       setLinks("previous-box", d.previous);
       setLinks("leads-box", d.leads_to);

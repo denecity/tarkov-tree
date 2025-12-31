@@ -76,6 +76,13 @@
     .node { cursor: pointer; }
     .node circle.core { stroke: var(--stroke); stroke-width: 1.5; }
     .node circle.status-ring { fill: none; stroke-width: 4; opacity: 0; }
+    .node circle.important-ring {
+      fill: none;
+      stroke: #f59e0b;
+      stroke-width: 4.5;
+      opacity: 0;
+      filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8));
+    }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .unlock-badge {
@@ -87,6 +94,9 @@
       paint-order: stroke;
       pointer-events: none;
     }
+    .node.is-important circle.important-ring { opacity: 1; }
+    .node.is-important circle.core { stroke: #fbbf24; stroke-width: 3; }
+    .node.is-important text { fill: #fef3c7; }
     .link { stroke: rgba(148,163,184,0.5); stroke-width: 1.6px; }
     .node.selected circle.core { stroke: var(--accent-2); stroke-width: 3; }
     .node.ancestor circle.core { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
@@ -152,6 +162,12 @@
       font-size: 11px;
     }
     .progress-btn.active { border-color: var(--accent); color: #bfdbfe; }
+    #important-toggle { border-color: #92400e; color: #fcd34d; }
+    #important-toggle.active {
+      border-color: #f59e0b;
+      color: #fef3c7;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
+    }
     .progress-action {
       padding: 4px 8px;
       border-radius: 999px;
@@ -199,6 +215,9 @@
           <button class="progress-btn" data-status="none">Not completed</button>
           <button class="progress-btn" data-status="completed">Completed</button>
         </div>
+        <div id="progress-flags">
+          <button class="progress-btn" id="important-toggle">Important</button>
+        </div>
         <div id="progress-actions">
           <button class="progress-action icon-btn" id="export-progress" aria-label="Export progress" title="Export JSON">
             <span class="material-symbols-outlined" aria-hidden="true">file_upload</span>
@@ -215,7 +234,7 @@
         <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
       </div>
     </div>
-    <div id="legend">Click nodes to expand details. Scroll / drag to navigate. Orange dot = unlocks.</div>
+    <div id="legend">Click nodes to expand details. Scroll / drag to navigate. Orange + = unlocks. Gold ring = important.</div>
     <div id="card">
       <h1>Select a quest</h1>
       <div class="meta"></div>
@@ -239,6 +258,7 @@
     const nodesById = new Map(nodes.map(n => [n.id, n]));
     const STORAGE_KEY = "tarkov-quest-progress";
     const PROGRESS_ENABLED_KEY = "tarkov-quest-progress-enabled";
+    const IMPORTANT_KEY = "tarkov-quest-important";
     const STATUS_LABELS = {
       none: "Not completed",
       completed: "Completed"
@@ -287,6 +307,42 @@
       }
     }
 
+    function loadImportant() {
+      try {
+        const raw = localStorage.getItem(IMPORTANT_KEY);
+        if (!raw) return new Set();
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return new Set();
+        return new Set(parsed);
+      } catch (_) {
+        return new Set();
+      }
+    }
+
+    function saveImportant() {
+      try {
+        localStorage.setItem(IMPORTANT_KEY, JSON.stringify(Array.from(importantSet)));
+      } catch (_) {
+        // Ignore storage failures (private mode, quota).
+      }
+    }
+
+    function isImportant(id) {
+      return importantSet.has(id);
+    }
+
+    function toggleImportant(id) {
+      if (!id) return;
+      if (importantSet.has(id)) {
+        importantSet.delete(id);
+      } else {
+        importantSet.add(id);
+      }
+      saveImportant();
+      applyImportantToNode(id);
+      updateImportantButton();
+    }
+
     function enableProgressLoading() {
       try {
         localStorage.setItem(PROGRESS_ENABLED_KEY, "true");
@@ -304,6 +360,7 @@
     }
 
     let progressMap = loadProgress();
+    let importantSet = loadImportant();
 
     function statusFor(id) {
       return progressMap.get(id) || "none";
@@ -382,6 +439,11 @@
         .on("end", dragended));
 
     node.append("circle")
+      .attr("class", "important-ring")
+      .attr("r", 24)
+      .attr("opacity", d => isImportant(d.id) ? 1 : 0);
+
+    node.append("circle")
       .attr("class", "status-ring")
       .attr("r", 18)
       .attr("stroke", d => statusColor(statusFor(d.id)))
@@ -417,6 +479,7 @@
       highlightAncestry(d.id);
     });
     applyProgressToNodes();
+    applyImportantToNodes();
 
     // Custom force to encourage targets to sit to the right of their sources
     function forceRightBias(strength = 0.1, gap = 80) {
@@ -435,7 +498,7 @@
     const simulation = d3.forceSimulation(nodes)
       .force("link", d3.forceLink(links).id(d => d.id).distance(140).strength(0.7))
       .force("charge", d3.forceManyBody().strength(-150))
-      .force("collide", d3.forceCollide(14))
+      .force("collide", d3.forceCollide(18))
       .force("x", d3.forceX(d => margin + (d.level || 0) * columnGap).strength(d => (d.level || 0) === 0 ? 1 : 0.6))
       .force("y", d3.forceY(height / 2).strength(0.02))
       .force("rightBias", forceRightBias(0.22, 90))
@@ -655,18 +718,20 @@
       setLinks("previous-box", d.previous);
       setLinks("leads-box", d.leads_to);
       updateProgressButtons();
+      updateImportantButton();
     }
 
     const search = document.getElementById("search");
     const searchResults = document.getElementById("search-results");
     const searchModeButtons = Array.from(document.querySelectorAll("#search-modes .mode-btn"));
     const openLinkBtn = document.getElementById("open-link");
-    const progressButtons = Array.from(document.querySelectorAll("#progress-buttons .progress-btn"));
+    const progressButtons = Array.from(document.querySelectorAll("#progress-buttons .progress-btn[data-status]"));
     const progressCurrent = document.getElementById("progress-current");
     const progressMessage = document.getElementById("progress-message");
     const exportProgressBtn = document.getElementById("export-progress");
     const importProgressInput = document.getElementById("import-progress");
     const clearProgressBtn = document.getElementById("clear-progress");
+    const importantToggleBtn = document.getElementById("important-toggle");
     let searchMode = "name";
 
     function setProgressMessage(text, tone = "info") {
@@ -684,6 +749,26 @@
       if (progressCurrent) {
         progressCurrent.textContent = `Status: ${STATUS_LABELS[status] || STATUS_LABELS.none}`;
       }
+    }
+
+    function updateImportantButton() {
+      if (!importantToggleBtn) return;
+      const active = selectedNode ? isImportant(selectedNode.id) : false;
+      importantToggleBtn.classList.toggle("active", active);
+    }
+
+    function applyImportantToNode(id) {
+      const important = isImportant(id);
+      node.filter(d => d.id === id)
+        .classed("is-important", important)
+        .select("circle.important-ring")
+        .attr("opacity", important ? 1 : 0);
+    }
+
+    function applyImportantToNodes() {
+      node.classed("is-important", d => isImportant(d.id));
+      node.select("circle.important-ring")
+        .attr("opacity", d => isImportant(d.id) ? 1 : 0);
     }
 
     function applyProgressToNode(id) {
@@ -785,6 +870,15 @@
         setProgressMessage(`Set to ${STATUS_LABELS[status] || STATUS_LABELS.none}.`, "success");
       });
     });
+
+    if (importantToggleBtn) {
+      importantToggleBtn.addEventListener("click", () => {
+        if (!selectedNode) return;
+        toggleImportant(selectedNode.id);
+        const message = isImportant(selectedNode.id) ? "Marked as important." : "Removed importance.";
+        setProgressMessage(message, "success");
+      });
+    }
 
     if (exportProgressBtn) {
       exportProgressBtn.addEventListener("click", () => exportProgressToFile());

@@ -498,11 +498,56 @@ HTML_TEMPLATE = """<!doctype html>
       .alpha(1)
       .on("tick", ticked);
 
+    const SETTLE_ALPHA = 0.02;
+    const SETTLE_VELOCITY = 0.03;
+    const SETTLE_TICKS = 24;
+    let settleCount = 0;
+    let isSettled = false;
+    let dragCount = 0;
+
     let coolTimer = null;
     function warmup() {
-      simulation.alphaTarget(0.3).restart();
+      isSettled = false;
+      settleCount = 0;
+      simulation.alpha(Math.max(simulation.alpha(), 0.45)).alphaTarget(0.3).restart();
       if (coolTimer) clearTimeout(coolTimer);
       coolTimer = setTimeout(() => simulation.alphaTarget(0), 20000);
+    }
+
+    function maxVelocity() {
+      let max = 0;
+      nodes.forEach(n => {
+        const vx = Math.abs(n.vx || 0);
+        const vy = Math.abs(n.vy || 0);
+        const v = vx + vy;
+        if (v > max) max = v;
+      });
+      return max;
+    }
+
+    function checkSettled() {
+      if (dragCount > 0) {
+        settleCount = 0;
+        isSettled = false;
+        return;
+      }
+      if (simulation.alpha() > SETTLE_ALPHA) {
+        settleCount = 0;
+        isSettled = false;
+        return;
+      }
+      const maxV = maxVelocity();
+      if (maxV < SETTLE_VELOCITY) {
+        settleCount += 1;
+        if (settleCount >= SETTLE_TICKS && !isSettled) {
+          isSettled = true;
+          simulation.alphaTarget(0);
+          simulation.stop();
+        }
+      } else {
+        settleCount = 0;
+        isSettled = false;
+      }
     }
 
     function ticked() {
@@ -512,10 +557,14 @@ HTML_TEMPLATE = """<!doctype html>
         .attr("x2", d => d.target.x)
         .attr("y2", d => d.target.y);
       node.attr("transform", d => `translate(${d.x},${d.y})`);
+      checkSettled();
     }
 
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.2).restart();
+      dragCount += 1;
+      isSettled = false;
+      settleCount = 0;
       if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots on the left
         event.subject.fy = event.subject.y; // allow y dragging
@@ -533,6 +582,7 @@ HTML_TEMPLATE = """<!doctype html>
 
     function dragended(event) {
       if (!event.active) simulation.alphaTarget(0);
+      dragCount = Math.max(0, dragCount - 1);
       if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots pinned on the left, free y
         event.subject.fy = null;
@@ -1045,6 +1095,7 @@ HTML_TEMPLATE = """<!doctype html>
     // Preselect first node
     selectNode(nodes[0]);
     highlightAncestry(nodes[0].id);
+    warmup();
   </script>
 </body>
 </html>

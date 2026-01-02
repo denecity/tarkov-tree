@@ -84,6 +84,13 @@
       opacity: 0;
       filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8));
     }
+    .node circle.available-ring {
+      fill: none;
+      stroke: #38bdf8;
+      stroke-width: 4;
+      opacity: 0;
+      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.75));
+    }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .unlock-badge {
@@ -98,6 +105,7 @@
     .node.is-important circle.important-ring { opacity: 1; }
     .node.is-important circle.core { stroke: #fbbf24; stroke-width: 3; }
     .node.is-important text { fill: #fef3c7; }
+    .node.is-available circle.available-ring { opacity: 1; }
     .link { stroke: rgba(148,163,184,0.5); stroke-width: 1.6px; }
     .node.selected circle.core { stroke: var(--accent-2); stroke-width: 3; }
     .node.ancestor circle.core { stroke: #38bdf8; stroke-width: 3; filter: drop-shadow(0 0 6px rgba(56,189,248,0.75)); }
@@ -107,7 +115,119 @@
     .node.is-completed circle.core { fill: #334155; stroke: #475569; }
     .node.is-completed text { fill: #94a3b8; text-shadow: none; }
     .node.is-completed .level-badge { fill: #e2e8f0; stroke: #1f2937; }
+    .node.is-filtered { opacity: 0.28; }
+    .link.is-filtered { stroke: rgba(148,163,184,0.15); }
+    #search-row { display: flex; align-items: center; gap: 8px; }
+    #filter-toggle {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: #0b1223;
+      color: var(--text);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #filter-toggle.is-active { border-color: var(--accent); color: #bfdbfe; }
     #search { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); }
+    #filter-panel {
+      display: none;
+      flex-direction: column;
+      gap: 12px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: #0b1223;
+    }
+    #filter-panel.is-open { display: flex; }
+    .filter-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+    .filter-field { display: flex; flex-direction: column; gap: 6px; }
+    .filter-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+    .filter-field select {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: #0f172a;
+      color: var(--text);
+      font-size: 12px;
+    }
+    #filter-clear {
+      align-self: flex-end;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      background: #0f172a;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .filter-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+    .filter-tag {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--stroke);
+      background: #0f172a;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .filter-tag.is-active { border-color: var(--accent); color: #bfdbfe; }
+    .range-field { flex: 1 1 260px; }
+    .range-values { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+    .range-wrap { position: relative; height: 28px; }
+    .range-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 12px;
+      height: 4px;
+      border-radius: 999px;
+      background: #111827;
+    }
+    .range-fill {
+      position: absolute;
+      top: 12px;
+      height: 4px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+    .range-wrap input[type="range"] {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 28px;
+      margin: 0;
+      background: none;
+      pointer-events: none;
+      -webkit-appearance: none;
+    }
+    .range-wrap input[type="range"].range-min { z-index: 3; }
+    .range-wrap input[type="range"].range-max { z-index: 4; }
+    .range-wrap input[type="range"]::-webkit-slider-runnable-track { height: 28px; background: transparent; }
+    .range-wrap input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #0b1223;
+      margin-top: 8px;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    .range-wrap input[type="range"]::-moz-range-track { height: 28px; background: transparent; }
+    .range-wrap input[type="range"]::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 2px solid #0b1223;
+      pointer-events: auto;
+      cursor: pointer;
+    }
     #search-modes { display: flex; gap: 8px; }
     #search-modes .mode-btn { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
     #search-modes .mode-btn.active { border-color: var(--accent); color: #bfdbfe; }
@@ -117,6 +237,8 @@
     #search-results .pill-row { display: flex; flex-wrap: wrap; gap: 6px; }
     #search-results .pill { padding: 6px 10px; border-radius: 999px; border: 1px solid var(--stroke); background: #0b1223; color: var(--text); cursor: pointer; font-size: 12px; }
     #search-results .pill:hover { border-color: var(--accent); color: #bfdbfe; }
+    #search-results .pill.is-filtered { opacity: 0.35; filter: grayscale(0.8); }
+    #search-results .item-group.is-filtered { opacity: 0.4; }
     #footer-bar {
       position: fixed;
       bottom: 0;
@@ -209,7 +331,48 @@
       <span id="progress-current">Status: Not completed</span>
       <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
     </div>
-    <input id="search" placeholder="Search quests..." />
+    <div id="search-row">
+      <button id="filter-toggle" aria-label="Filters" title="Filters">
+        <span class="material-symbols-outlined" aria-hidden="true">filter_alt</span>
+      </button>
+      <input id="search" placeholder="Search quests..." />
+    </div>
+    <div id="filter-panel">
+      <div class="filter-row">
+        <div class="filter-field">
+          <label for="filter-trader">Trader</label>
+          <select id="filter-trader"></select>
+        </div>
+        <div class="filter-field">
+          <label for="filter-location">Map</label>
+          <select id="filter-location"></select>
+        </div>
+        <button id="filter-clear">Clear</button>
+      </div>
+      <div class="filter-row">
+        <div class="filter-field">
+          <label>Unlocks</label>
+          <div class="filter-tags">
+            <button class="filter-tag" data-unlock="purchase">Purchase unlock</button>
+            <button class="filter-tag" data-unlock="barter">Barter unlock</button>
+            <button class="filter-tag" data-unlock="craft">Crafting unlock</button>
+          </div>
+        </div>
+        <div class="filter-field range-field">
+          <label>XP reward</label>
+          <div class="range-values">
+            <span id="xp-min-label">0</span>
+            <span id="xp-max-label">0</span>
+          </div>
+          <div class="range-wrap">
+            <div class="range-track"></div>
+            <div class="range-fill" id="xp-range-fill"></div>
+            <input class="range-min" id="xp-range-min" type="range" min="0" max="0" value="0" step="100" />
+            <input class="range-max" id="xp-range-max" type="range" min="0" max="0" value="0" step="100" />
+          </div>
+        </div>
+      </div>
+    </div>
     <div id="search-modes">
       <button class="mode-btn active" data-mode="name">Name</button>
       <button class="mode-btn" data-mode="reward">Reward</button>
@@ -342,6 +505,7 @@
 
     let progressMap = loadProgress();
     let importantSet = loadImportant();
+    let availableSet = new Set();
 
     function statusFor(id) {
       return progressMap.get(id) || "none";
@@ -361,6 +525,10 @@
 
     function rewardHasUnlocks(rewards) {
       return (rewards || []).some(reward => UNLOCK_RE.test(reward || ""));
+    }
+
+    function isAvailable(id) {
+      return availableSet.has(id);
     }
 
     function saveProgress() {
@@ -418,6 +586,11 @@
         .on("start", dragstarted)
         .on("drag", dragged)
         .on("end", dragended));
+
+    node.append("circle")
+      .attr("class", "available-ring")
+      .attr("r", 20)
+      .attr("opacity", d => isAvailable(d.id) ? 1 : 0);
 
     node.append("circle")
       .attr("class", "important-ring")
@@ -763,7 +936,22 @@
     const importProgressInput = document.getElementById("import-progress");
     const clearProgressBtn = document.getElementById("clear-progress");
     const importantToggleBtn = document.getElementById("important-toggle");
+    const filterToggleBtn = document.getElementById("filter-toggle");
+    const filterPanel = document.getElementById("filter-panel");
+    const filterTrader = document.getElementById("filter-trader");
+    const filterLocation = document.getElementById("filter-location");
+    const filterClearBtn = document.getElementById("filter-clear");
+    const unlockTagButtons = Array.from(document.querySelectorAll(".filter-tag[data-unlock]"));
+    const xpRangeMin = document.getElementById("xp-range-min");
+    const xpRangeMax = document.getElementById("xp-range-max");
+    const xpMinLabel = document.getElementById("xp-min-label");
+    const xpMaxLabel = document.getElementById("xp-max-label");
+    const xpRangeFill = document.getElementById("xp-range-fill");
     let searchMode = "name";
+    const filterState = { trader: "all", location: "all", unlocks: new Set(), xpMin: null, xpMax: null };
+    const XP_SLIDER_MIN = 0;
+    const XP_SLIDER_MAX = 100000;
+    const xpBounds = { min: XP_SLIDER_MIN, max: XP_SLIDER_MAX };
 
     function setProgressMessage(text, tone = "info") {
       if (!progressMessage) return;
@@ -780,6 +968,152 @@
       if (progressCurrent) {
         progressCurrent.textContent = `Status: ${STATUS_LABELS[status] || STATUS_LABELS.none}`;
       }
+    }
+
+    function buildFilterOptions(selectEl, values, includeUnknown = false) {
+      if (!selectEl) return;
+      const current = selectEl.value || "all";
+      selectEl.innerHTML = "";
+      const allOpt = document.createElement("option");
+      allOpt.value = "all";
+      allOpt.textContent = "All";
+      selectEl.appendChild(allOpt);
+      if (includeUnknown) {
+        const unknownOpt = document.createElement("option");
+        unknownOpt.value = "unknown";
+        unknownOpt.textContent = "Unknown";
+        selectEl.appendChild(unknownOpt);
+      }
+      values.forEach((val) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = val;
+        selectEl.appendChild(opt);
+      });
+      if (Array.from(selectEl.options).some(opt => opt.value === current)) {
+        selectEl.value = current;
+      }
+    }
+
+    function parseLocationList(raw) {
+      if (!raw) return [];
+      return String(raw)
+        .split(",")
+        .map(part => part.trim())
+        .filter(Boolean);
+    }
+
+    function parseXpReward(rewards) {
+      if (!rewards) return null;
+      for (const reward of rewards) {
+        const match = String(reward).match(/([0-9][0-9,]*)\s*EXP/i);
+        if (match) {
+          const value = parseInt(match[1].replace(/,/g, ""), 10);
+          if (!Number.isNaN(value)) return value;
+        }
+      }
+      return null;
+    }
+
+    function unlockTypesFor(rewards) {
+      const types = new Set();
+      if (!rewards) return types;
+      rewards.forEach((reward) => {
+        const match = String(reward).match(/^Unlocks\s+(purchase|barter|craft)/i);
+        if (match) {
+          types.add(match[1].toLowerCase());
+        }
+      });
+      return types;
+    }
+
+    function formatXpValue(value) {
+      if (value == null) return "-";
+      if (value >= XP_SLIDER_MAX) return "100000+";
+      return value.toLocaleString("en-US");
+    }
+
+    function updateXpTrack(minValue, maxValue, bounds) {
+      if (!xpRangeFill || !bounds) return;
+      const span = bounds.max - bounds.min || 1;
+      const minPercent = ((minValue - bounds.min) / span) * 100;
+      const maxPercent = ((maxValue - bounds.min) / span) * 100;
+      xpRangeFill.style.left = `${minPercent}%`;
+      xpRangeFill.style.width = `${Math.max(0, maxPercent - minPercent)}%`;
+    }
+
+    function updateXpState(fromInput, bounds) {
+      if (!xpRangeMin || !xpRangeMax || !bounds) return;
+      let minValue = parseInt(xpRangeMin.value, 10);
+      let maxValue = parseInt(xpRangeMax.value, 10);
+      if (Number.isNaN(minValue)) minValue = bounds.min;
+      if (Number.isNaN(maxValue)) maxValue = bounds.max;
+      if (minValue > maxValue) {
+        if (fromInput === xpRangeMin) {
+          maxValue = minValue;
+        } else {
+          minValue = maxValue;
+        }
+      }
+      xpRangeMin.value = String(minValue);
+      xpRangeMax.value = String(maxValue);
+      filterState.xpMin = minValue;
+      filterState.xpMax = maxValue;
+      if (minValue >= maxValue - 100) {
+        xpRangeMin.style.zIndex = "5";
+      } else {
+        xpRangeMin.style.zIndex = "3";
+      }
+      xpRangeMax.style.zIndex = "4";
+      if (xpMinLabel) xpMinLabel.textContent = formatXpValue(minValue);
+      if (xpMaxLabel) xpMaxLabel.textContent = formatXpValue(maxValue);
+      updateXpTrack(minValue, maxValue, bounds);
+    }
+
+    function filterMatches(node) {
+      if (!node) return false;
+      if (filterState.trader !== "all") {
+        if (filterState.trader === "unknown") {
+          if (node.given_by) return false;
+        } else if (node.given_by !== filterState.trader) {
+          return false;
+        }
+      }
+      if (filterState.location !== "all") {
+        const locations = parseLocationList(node.location);
+        if (filterState.location === "unknown") {
+          if (locations.length) return false;
+        } else if (!locations.includes(filterState.location)) {
+          return false;
+        }
+      }
+      if (filterState.unlocks.size) {
+        const unlocks = unlockTypesFor(node.rewards);
+        let matchesUnlock = false;
+        filterState.unlocks.forEach((type) => {
+          if (unlocks.has(type)) matchesUnlock = true;
+        });
+        if (!matchesUnlock) return false;
+      }
+      if (filterState.xpMin != null && filterState.xpMax != null) {
+        const xp = parseXpReward(node.rewards);
+        const boundsActive = filterState.xpMin > xpBounds.min || filterState.xpMax < xpBounds.max;
+        if (boundsActive) {
+          if (xp == null) return false;
+          if (xp < filterState.xpMin || xp > filterState.xpMax) return false;
+        }
+      }
+      return true;
+    }
+
+    function applyFilters() {
+      node.classed("is-filtered", d => !filterMatches(d));
+      link.classed("is-filtered", l => {
+        const src = l.source.id ? l.source : nodesById.get(l.source);
+        const tgt = l.target.id ? l.target : nodesById.get(l.target);
+        return !filterMatches(src) || !filterMatches(tgt);
+      });
+      renderSearchResults(search.value.trim().toLowerCase());
     }
 
     function updateImportantButton() {
@@ -802,6 +1136,29 @@
         .attr("opacity", d => isImportant(d.id) ? 1 : 0);
     }
 
+    function computeAvailableSet() {
+      const children = buildChildren();
+      const completed = new Set();
+      nodes.forEach(n => {
+        if (statusFor(n.id) === "completed") completed.add(n.id);
+      });
+      const next = new Set();
+      completed.forEach((id) => {
+        const targets = children.get(id) || [];
+        targets.forEach((childId) => {
+          if (!completed.has(childId)) next.add(childId);
+        });
+      });
+      availableSet = next;
+    }
+
+    function applyAvailableToNodes() {
+      computeAvailableSet();
+      node.classed("is-available", d => isAvailable(d.id));
+      node.select("circle.available-ring")
+        .attr("opacity", d => isAvailable(d.id) ? 1 : 0);
+    }
+
     function applyProgressToNode(id) {
       const status = statusFor(id);
       const target = nodesById.get(id);
@@ -813,6 +1170,7 @@
         .select("circle.status-ring")
         .attr("stroke", statusColor(status))
         .attr("opacity", status === "none" ? 0 : 1);
+      applyAvailableToNodes();
     }
 
     function applyProgressToNodes() {
@@ -825,6 +1183,7 @@
       node.select("circle.status-ring")
         .attr("stroke", d => statusColor(statusFor(d.id)))
         .attr("opacity", d => statusFor(d.id) === "none" ? 0 : 1);
+      applyAvailableToNodes();
     }
 
     function setStatus(id, status) {
@@ -892,6 +1251,72 @@
         renderSearchResults(search.value.trim().toLowerCase());
       });
     });
+
+    if (filterToggleBtn && filterPanel) {
+      filterToggleBtn.addEventListener("click", () => {
+        const isOpen = filterPanel.classList.toggle("is-open");
+        filterToggleBtn.classList.toggle("is-active", isOpen);
+      });
+    }
+
+    if (filterTrader) {
+      filterTrader.addEventListener("change", () => {
+        filterState.trader = filterTrader.value || "all";
+        applyFilters();
+      });
+    }
+
+    if (filterLocation) {
+      filterLocation.addEventListener("change", () => {
+        filterState.location = filterLocation.value || "all";
+        applyFilters();
+      });
+    }
+
+    if (unlockTagButtons.length) {
+      unlockTagButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const type = btn.dataset.unlock;
+          if (!type) return;
+          if (filterState.unlocks.has(type)) {
+            filterState.unlocks.delete(type);
+            btn.classList.remove("is-active");
+          } else {
+            filterState.unlocks.add(type);
+            btn.classList.add("is-active");
+          }
+          applyFilters();
+        });
+      });
+    }
+
+    if (xpRangeMin && xpRangeMax) {
+      xpRangeMin.addEventListener("input", () => {
+        updateXpState(xpRangeMin, xpBounds);
+        applyFilters();
+      });
+      xpRangeMax.addEventListener("input", () => {
+        updateXpState(xpRangeMax, xpBounds);
+        applyFilters();
+      });
+    }
+
+    if (filterClearBtn) {
+      filterClearBtn.addEventListener("click", () => {
+        filterState.trader = "all";
+        filterState.location = "all";
+        if (filterTrader) filterTrader.value = "all";
+        if (filterLocation) filterLocation.value = "all";
+        filterState.unlocks.clear();
+        unlockTagButtons.forEach(btn => btn.classList.remove("is-active"));
+        if (xpRangeMin && xpRangeMax) {
+          xpRangeMin.value = String(xpBounds.min);
+          xpRangeMax.value = String(xpBounds.max);
+          updateXpState(xpRangeMax, xpBounds);
+        }
+        applyFilters();
+      });
+    }
 
     progressButtons.forEach(btn => {
       btn.addEventListener("click", () => {
@@ -1035,6 +1460,7 @@
         matches.forEach(n => {
           const pill = document.createElement("span");
           pill.className = "pill";
+          pill.classList.toggle("is-filtered", !filterMatches(n));
           pill.textContent = n.name;
           pill.addEventListener("click", () => focusNode(n));
           searchResults.appendChild(pill);
@@ -1059,9 +1485,13 @@
         box.appendChild(title);
         const row = document.createElement("div");
         row.className = "pill-row";
+        let allFiltered = true;
         arr.forEach(({ node: n, count, kind, place }) => {
           const pill = document.createElement("span");
           pill.className = "pill";
+          const filteredOut = !filterMatches(n);
+          pill.classList.toggle("is-filtered", filteredOut);
+          if (!filteredOut) allFiltered = false;
           const meta = [];
           if (kind) meta.push(kind);
           if (place) meta.push(place);
@@ -1071,6 +1501,7 @@
           row.appendChild(pill);
         });
         box.appendChild(row);
+        box.classList.toggle("is-filtered", allFiltered);
         searchResults.appendChild(box);
       });
       }
@@ -1085,6 +1516,27 @@
     selectNode(nodes[0]);
     highlightAncestry(nodes[0].id);
     warmup();
+    const traders = Array.from(new Set(nodes.map(n => n.given_by).filter(Boolean))).sort();
+    const locations = Array.from(new Set(nodes.flatMap(n => parseLocationList(n.location)))).sort();
+    buildFilterOptions(filterTrader, traders, nodes.some(n => !n.given_by));
+    buildFilterOptions(filterLocation, locations, nodes.some(n => !n.location));
+    xpBounds.min = XP_SLIDER_MIN;
+    xpBounds.max = XP_SLIDER_MAX;
+    if (xpRangeMin && xpRangeMax) {
+      xpRangeMin.min = String(xpBounds.min);
+      xpRangeMin.max = String(xpBounds.max);
+      xpRangeMax.min = String(xpBounds.min);
+      xpRangeMax.max = String(xpBounds.max);
+      xpRangeMin.value = String(xpBounds.min);
+      xpRangeMax.value = String(xpBounds.max);
+      updateXpState(xpRangeMax, xpBounds);
+    } else {
+      filterState.xpMin = xpBounds.min;
+      filterState.xpMax = xpBounds.max;
+      if (xpMinLabel) xpMinLabel.textContent = formatXpValue(xpBounds.min);
+      if (xpMaxLabel) xpMaxLabel.textContent = formatXpValue(xpBounds.max);
+    }
+    applyFilters();
   </script>
 </body>
 </html>

@@ -48,6 +48,7 @@ HTML_TEMPLATE = """<!doctype html>
       gap: 12px;
       box-shadow: -6px 0 24px rgba(0,0,0,0.4);
       overflow-y: auto;
+      padding-bottom: 36px;
     }
     #panel h1 {
       margin: 0;
@@ -151,44 +152,28 @@ HTML_TEMPLATE = """<!doctype html>
     #footer-bar a:hover {
       text-decoration: underline;
     }
-    #progress-bar {
-      background: var(--card);
-      border: 1px solid var(--stroke);
-      border-radius: 10px;
-      padding: 8px 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .progress-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .progress-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
-    #progress-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+    #progress-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .progress-btn {
-      padding: 4px 8px;
-      border-radius: 999px;
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 8px;
       border: 1px solid var(--stroke);
       background: #0b1223;
       color: var(--text);
       cursor: pointer;
-      font-size: 11px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .progress-btn.active { border-color: var(--accent); color: #bfdbfe; }
-    #important-toggle { border-color: #92400e; color: #fcd34d; }
+    .progress-btn.active { border-color: var(--accent); color: #bfdbfe; box-shadow: 0 0 10px rgba(59,130,246,0.3); }
+    #important-toggle { border-color: #92400e; color: #f59e0b; }
     #important-toggle.active {
       border-color: #f59e0b;
       color: #fef3c7;
       box-shadow: 0 0 12px rgba(245, 158, 11, 0.45);
     }
-    .progress-action {
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--stroke);
-      background: #0b1223;
-      color: var(--text);
-      cursor: pointer;
-      font-size: 11px;
-    }
-    .file-input { position: relative; overflow: hidden; display: inline-flex; align-items: center; gap: 6px; }
+    .file-input { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; }
     .file-input input {
       position: absolute;
       inset: 0;
@@ -200,8 +185,6 @@ HTML_TEMPLATE = """<!doctype html>
     #progress-message { min-height: 14px; font-size: 11px; color: var(--muted); }
     #progress-message[data-tone="success"] { color: #86efac; }
     #progress-message[data-tone="error"] { color: #fca5a5; }
-    #progress-actions { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-    .progress-action.icon-btn { width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
     .material-symbols-outlined {
       font-size: 18px;
       line-height: 1;
@@ -212,6 +195,31 @@ HTML_TEMPLATE = """<!doctype html>
 <body>
   <div id="chart"></div>
   <div id="panel">
+    <div id="progress-toolbar">
+      <button class="progress-btn" data-status="none" aria-label="Not completed" title="Not completed">
+        <span class="material-symbols-outlined" aria-hidden="true">check_box_outline_blank</span>
+      </button>
+      <button class="progress-btn" data-status="completed" aria-label="Completed" title="Completed">
+        <span class="material-symbols-outlined" aria-hidden="true">check_box</span>
+      </button>
+      <button class="progress-btn" id="important-toggle" aria-label="Important quest" title="Important quest">
+        <span class="material-symbols-outlined" aria-hidden="true">priority_high</span>
+      </button>
+      <button class="progress-btn" id="export-progress" aria-label="Export progress" title="Export JSON">
+        <span class="material-symbols-outlined" aria-hidden="true">file_upload</span>
+      </button>
+      <label class="progress-btn file-input" aria-label="Import progress" title="Import JSON">
+        <input id="import-progress" type="file" accept="application/json" />
+        <span class="material-symbols-outlined" aria-hidden="true">file_download</span>
+      </label>
+      <button class="progress-btn" id="clear-progress" aria-label="Clear all progress" title="Clear all progress">
+        <span class="material-symbols-outlined" aria-hidden="true">delete</span>
+      </button>
+    </div>
+    <div id="progress-meta">
+      <span id="progress-current">Status: Not completed</span>
+      <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
+    </div>
     <input id="search" placeholder="Search quests..." />
     <div id="search-modes">
       <button class="mode-btn active" data-mode="name">Name</button>
@@ -219,33 +227,6 @@ HTML_TEMPLATE = """<!doctype html>
       <button class="mode-btn" data-mode="unlock">Unlocks</button>
     </div>
     <div id="search-results"></div>
-    <div id="progress-bar">
-      <div class="progress-row">
-        <div class="progress-title">Progress</div>
-        <div id="progress-buttons">
-          <button class="progress-btn" data-status="none">Not completed</button>
-          <button class="progress-btn" data-status="completed">Completed</button>
-        </div>
-        <div id="progress-flags">
-          <button class="progress-btn" id="important-toggle">Important</button>
-        </div>
-        <div id="progress-actions">
-          <button class="progress-action icon-btn" id="export-progress" aria-label="Export progress" title="Export JSON">
-            <span class="material-symbols-outlined" aria-hidden="true">file_upload</span>
-          </button>
-          <label class="progress-action icon-btn file-input" aria-label="Import progress" title="Import JSON">
-            <input id="import-progress" type="file" accept="application/json" />
-            <span class="material-symbols-outlined" aria-hidden="true">file_download</span>
-          </label>
-          <button class="progress-action" id="clear-progress" title="Clear all progress">Clear</button>
-        </div>
-      </div>
-      <div id="progress-meta">
-        <span id="progress-current">Status: Not completed</span>
-        <span id="progress-message" data-tone="info">Stored locally in your browser.</span>
-      </div>
-    </div>
-    <div id="legend">Click nodes to expand details. Scroll / drag to navigate. Orange + = unlocks. Gold ring = important.</div>
     <div id="card">
       <h1>Select a quest</h1>
       <div class="meta"></div>
@@ -736,7 +717,7 @@ HTML_TEMPLATE = """<!doctype html>
     const searchResults = document.getElementById("search-results");
     const searchModeButtons = Array.from(document.querySelectorAll("#search-modes .mode-btn"));
     const openLinkBtn = document.getElementById("open-link");
-    const progressButtons = Array.from(document.querySelectorAll("#progress-buttons .progress-btn[data-status]"));
+    const progressButtons = Array.from(document.querySelectorAll("#progress-toolbar .progress-btn[data-status]"));
     const progressCurrent = document.getElementById("progress-current");
     const progressMessage = document.getElementById("progress-message");
     const exportProgressBtn = document.getElementById("export-progress");

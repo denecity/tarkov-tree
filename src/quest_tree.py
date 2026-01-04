@@ -510,7 +510,8 @@ HTML_TEMPLATE = """<!doctype html>
       return {
         version: 1,
         updatedAt: new Date().toISOString(),
-        statuses: Object.fromEntries(progress)
+        statuses: Object.fromEntries(progress),
+        important: Array.from(importantSet)
       };
     }
 
@@ -674,17 +675,23 @@ HTML_TEMPLATE = """<!doctype html>
     const SETTLE_ALPHA = 0.02;
     const SETTLE_VELOCITY = 0.03;
     const SETTLE_TICKS = 24;
+    const WARMUP_ALPHA = 0.22;
+    const WARMUP_TARGET = 0.12;
+    const WARMUP_DURATION = 12000;
+    const DRAG_THRESHOLD = 4;
     let settleCount = 0;
     let isSettled = false;
     let dragCount = 0;
+    let dragStart = null;
+    let dragMoved = false;
 
     let coolTimer = null;
-    function warmup() {
+    function warmup(alpha = WARMUP_ALPHA, target = WARMUP_TARGET, duration = WARMUP_DURATION) {
       isSettled = false;
       settleCount = 0;
-      simulation.alpha(Math.max(simulation.alpha(), 0.45)).alphaTarget(0.3).restart();
+      simulation.alpha(Math.max(simulation.alpha(), alpha)).alphaTarget(target).restart();
       if (coolTimer) clearTimeout(coolTimer);
-      coolTimer = setTimeout(() => simulation.alphaTarget(0), 20000);
+      coolTimer = setTimeout(() => simulation.alphaTarget(0), duration);
     }
 
     function maxVelocity() {
@@ -734,10 +741,8 @@ HTML_TEMPLATE = """<!doctype html>
     }
 
     function dragstarted(event) {
-      if (!event.active) simulation.alphaTarget(0.2).restart();
-      dragCount += 1;
-      isSettled = false;
-      settleCount = 0;
+      dragStart = { x: event.x, y: event.y };
+      dragMoved = false;
       if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots on the left
         event.subject.fy = event.subject.y; // allow y dragging
@@ -745,17 +750,27 @@ HTML_TEMPLATE = """<!doctype html>
         event.subject.fx = event.subject.x;
         event.subject.fy = event.subject.y;
       }
-      warmup();
     }
 
     function dragged(event) {
+      if (!dragMoved && dragStart) {
+        const dx = event.x - dragStart.x;
+        const dy = event.y - dragStart.y;
+        if (Math.hypot(dx, dy) >= DRAG_THRESHOLD) {
+          dragMoved = true;
+          dragCount += 1;
+          warmup(0.2, 0.1, 8000);
+        }
+      }
       event.subject.fx = event.x;
       event.subject.fy = event.y;
     }
 
     function dragended(event) {
-      if (!event.active) simulation.alphaTarget(0);
-      dragCount = Math.max(0, dragCount - 1);
+      if (dragMoved) {
+        if (!event.active) simulation.alphaTarget(0);
+        dragCount = Math.max(0, dragCount - 1);
+      }
       if (lockableRoot(event.subject)) {
         event.subject.fx = margin; // keep roots pinned on the left, free y
         event.subject.fy = null;
@@ -763,6 +778,8 @@ HTML_TEMPLATE = """<!doctype html>
         event.subject.fx = null;
         event.subject.fy = null;
       }
+      dragStart = null;
+      dragMoved = false;
     }
 
     function colorByTrader(trader) {
@@ -1220,6 +1237,16 @@ HTML_TEMPLATE = """<!doctype html>
       }
     }
 
+    function replaceImportant(newSet, message) {
+      importantSet = newSet;
+      saveImportant();
+      applyImportantToNodes();
+      updateImportantButton();
+      if (message) {
+        setProgressMessage(message, "success");
+      }
+    }
+
     function importProgressFromText(rawText) {
       try {
         const parsed = JSON.parse(rawText);
@@ -1236,6 +1263,9 @@ HTML_TEMPLATE = """<!doctype html>
         });
         enableProgressLoading();
         replaceProgress(map, "Imported progress JSON.");
+        if (parsed && Array.isArray(parsed.important)) {
+          replaceImportant(new Set(parsed.important), "Imported important quests.");
+        }
       } catch (err) {
         setProgressMessage("Could not import JSON. Check the file format.", "error");
       }

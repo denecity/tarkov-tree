@@ -71,6 +71,41 @@
       letter-spacing: 0.6px;
     }
     #legend { font-size: 12px; color: var(--muted); }
+    #trader-legend {
+      position: absolute;
+      left: 16px;
+      right: 16px;
+      bottom: 34px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--stroke);
+      background: rgba(11, 18, 35, 0.92);
+      backdrop-filter: blur(6px);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none;
+    }
+    #trader-legend .legend-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+    }
+    #trader-legend .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text);
+    }
+    #trader-legend .legend-swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid var(--stroke);
+    }
     #open-link { padding: 10px 12px; border: 1px solid var(--accent); background: rgba(59,130,246,0.15); color: #bfdbfe; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 4px; align-self: flex-start; display: inline-flex; text-decoration: none; }
     #open-link.is-disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--stroke); pointer-events: none; }
     svg { width: 100%; height: 100%; background: transparent; }
@@ -93,6 +128,7 @@
     }
     .node text { pointer-events: none; font-size: 12px; fill: var(--text); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .level-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+    .node .dependents-badge { font-size: 9px; font-weight: 700; fill: #f8fafc; stroke: #0b1223; stroke-width: 0.5px; paint-order: stroke; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
     .node .unlock-badge {
       font-size: 18px;
       font-weight: 800;
@@ -304,7 +340,11 @@
   </style>
 </head>
 <body>
-  <div id="chart"></div>
+  <div id="chart">
+    <div id="trader-legend">
+      <div class="legend-grid"></div>
+    </div>
+  </div>
   <div id="panel">
     <div id="progress-toolbar">
       <button class="progress-btn" data-status="none" aria-label="Not completed" title="Not completed">
@@ -388,7 +428,6 @@
       <div class="section" id="requirements-box"><h3>Requirements</h3><ul></ul></div>
       <div class="section" id="previous-box"><h3>Previous</h3><p>-</p></div>
       <div class="section" id="leads-box"><h3>Leads to</h3><p>-</p></div>
-    </div>
   </div>
   <div id="footer-bar">
     Scraped for Tarkov 1.0.1.0.42625 — missing quest info? Contact me or fork the repo at
@@ -629,6 +668,20 @@
       .attr("y", 4)
       .text(d => d.name);
 
+    const childrenForCounts = buildChildren();
+    const dependentsById = new Map();
+    nodes.forEach(n => {
+      const desc = collectDescendants(n.id, childrenForCounts, new Set());
+      dependentsById.set(n.id, Math.max(0, desc.size - 1));
+    });
+
+    node.append("text")
+      .attr("class", "dependents-badge")
+      .attr("x", 6)
+      .attr("y", 14)
+      .attr("text-anchor", "start")
+      .text(d => dependentsById.get(d.id) || "");
+
     node.on("click", (_, d) => {
       selectNode(d);
       highlightAncestry(d.id);
@@ -786,6 +839,27 @@
         "Ref": "#8b5cf6"
       };
       return palette[trader] || "#64748b";
+    }
+
+    function renderTraderLegend(traders) {
+      const legend = document.getElementById("trader-legend");
+      if (!legend) return;
+      const grid = legend.querySelector(".legend-grid");
+      if (!grid) return;
+      grid.innerHTML = "";
+      (traders || []).forEach((name) => {
+        if (!name) return;
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        const swatch = document.createElement("span");
+        swatch.className = "legend-swatch";
+        swatch.style.background = colorByTrader(name);
+        const label = document.createElement("span");
+        label.textContent = name;
+        item.appendChild(swatch);
+        item.appendChild(label);
+        grid.appendChild(item);
+      });
     }
 
     const card = document.getElementById("card");
@@ -987,29 +1061,50 @@
       }
     }
 
-    function buildFilterOptions(selectEl, values, includeUnknown = false) {
+    function filterCount(overrides = {}) {
+      const merged = {
+        trader: filterState.trader,
+        location: filterState.location,
+        unlocks: new Set(filterState.unlocks),
+        xpMin: filterState.xpMin,
+        xpMax: filterState.xpMax,
+        ...overrides,
+      };
+      return nodes.reduce((acc, n) => acc + (filterMatches(n, merged) ? 1 : 0), 0);
+    }
+
+    function buildFilterOptions(selectEl, values, includeUnknown = false, key = "generic") {
       if (!selectEl) return;
       const current = selectEl.value || "all";
       selectEl.innerHTML = "";
       const allOpt = document.createElement("option");
       allOpt.value = "all";
-      allOpt.textContent = "All";
+      const allCount = key === "generic" ? nodes.length : filterCount({ [key]: "all" });
+      allOpt.textContent = `All (${allCount})`;
       selectEl.appendChild(allOpt);
       if (includeUnknown) {
         const unknownOpt = document.createElement("option");
         unknownOpt.value = "unknown";
-        unknownOpt.textContent = "Unknown";
+        const unknownCount = key === "generic" ? 0 : filterCount({ [key]: "unknown" });
+        unknownOpt.textContent = `Unknown (${unknownCount})`;
         selectEl.appendChild(unknownOpt);
       }
       values.forEach((val) => {
         const opt = document.createElement("option");
         opt.value = val;
-        opt.textContent = val;
+        const count = key === "generic" ? nodes.length : filterCount({ [key]: val });
+        opt.textContent = `${val} (${count})`;
         selectEl.appendChild(opt);
       });
       if (Array.from(selectEl.options).some(opt => opt.value === current)) {
         selectEl.value = current;
       }
+    }
+
+
+    function refreshFilterOptions() {
+      buildFilterOptions(filterTrader, traders, nodes.some(n => !n.given_by), "trader");
+      buildFilterOptions(filterLocation, locations, nodes.some(n => !n.location), "location");
     }
 
     function parseLocationList(raw) {
@@ -1087,37 +1182,37 @@
       updateXpTrack(minValue, maxValue, bounds);
     }
 
-    function filterMatches(node) {
+    function filterMatches(node, state = filterState) {
       if (!node) return false;
-      if (filterState.trader !== "all") {
-        if (filterState.trader === "unknown") {
+      if (state.trader != null && state.trader !== "all") {
+        if (state.trader === "unknown") {
           if (node.given_by) return false;
-        } else if (node.given_by !== filterState.trader) {
+        } else if (node.given_by !== state.trader) {
           return false;
         }
       }
-      if (filterState.location !== "all") {
+      if (state.location != null && state.location !== "all") {
         const locations = parseLocationList(node.location);
-        if (filterState.location === "unknown") {
+        if (state.location === "unknown") {
           if (locations.length) return false;
-        } else if (!locations.includes(filterState.location)) {
+        } else if (!locations.includes(state.location)) {
           return false;
         }
       }
-      if (filterState.unlocks.size) {
+      if (state.unlocks && state.unlocks.size) {
         const unlocks = unlockTypesFor(node.rewards);
         let matchesUnlock = false;
-        filterState.unlocks.forEach((type) => {
+        state.unlocks.forEach((type) => {
           if (unlocks.has(type)) matchesUnlock = true;
         });
         if (!matchesUnlock) return false;
       }
-      if (filterState.xpMin != null && filterState.xpMax != null) {
+      if (state.xpMin != null && state.xpMax != null) {
         const xp = parseXpReward(node.rewards);
-        const boundsActive = filterState.xpMin > xpBounds.min || filterState.xpMax < xpBounds.max;
+        const boundsActive = state.xpMin > xpBounds.min || state.xpMax < xpBounds.max;
         if (boundsActive) {
           if (xp == null) return false;
-          if (xp < filterState.xpMin || xp > filterState.xpMax) return false;
+          if (xp < state.xpMin || xp > state.xpMax) return false;
         }
       }
       return true;
@@ -1292,6 +1387,7 @@
     if (filterTrader) {
       filterTrader.addEventListener("change", () => {
         filterState.trader = filterTrader.value || "all";
+        refreshFilterOptions();
         applyFilters();
       });
     }
@@ -1299,6 +1395,7 @@
     if (filterLocation) {
       filterLocation.addEventListener("change", () => {
         filterState.location = filterLocation.value || "all";
+        refreshFilterOptions();
         applyFilters();
       });
     }
@@ -1315,6 +1412,7 @@
             filterState.unlocks.add(type);
             btn.classList.add("is-active");
           }
+          refreshFilterOptions();
           applyFilters();
         });
       });
@@ -1323,10 +1421,12 @@
     if (xpRangeMin && xpRangeMax) {
       xpRangeMin.addEventListener("input", () => {
         updateXpState(xpRangeMin, xpBounds);
+        refreshFilterOptions();
         applyFilters();
       });
       xpRangeMax.addEventListener("input", () => {
         updateXpState(xpRangeMax, xpBounds);
+        refreshFilterOptions();
         applyFilters();
       });
     }
@@ -1344,6 +1444,7 @@
           xpRangeMax.value = String(xpBounds.max);
           updateXpState(xpRangeMax, xpBounds);
         }
+        refreshFilterOptions();
         applyFilters();
       });
     }
@@ -1548,8 +1649,8 @@
     warmup();
     const traders = Array.from(new Set(nodes.map(n => n.given_by).filter(Boolean))).sort();
     const locations = Array.from(new Set(nodes.flatMap(n => parseLocationList(n.location)))).sort();
-    buildFilterOptions(filterTrader, traders, nodes.some(n => !n.given_by));
-    buildFilterOptions(filterLocation, locations, nodes.some(n => !n.location));
+    refreshFilterOptions();
+    renderTraderLegend(traders);
     xpBounds.min = XP_SLIDER_MIN;
     xpBounds.max = XP_SLIDER_MAX;
     if (xpRangeMin && xpRangeMax) {
